@@ -7,3 +7,4 @@ import '@/ai/flows/adaptive-learning-generator.ts';
 import '@/ai/flows/semantic-answer-evaluator-flow.ts';
 import '@/ai/flows/flashcards-generator.ts';
 import '@/ai/flows/study-guide-generator.ts';
+import '@/ai/flows/ai-tutor-chat.ts';

@@ -30,6 +30,28 @@
       },
       "required": ["title", "content", "timestamp", "questions"]
     },
+    "TutorChat": {
+      "title": "Tutor Chat",
+      "description": "A chat conversation between a student and the AI Tutor.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "sessionId": { "type": "string" },
+        "lastMessageAt": { "type": "number" },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "role": { "type": "string", "enum": ["user", "model"] },
+              "text": { "type": "string" },
+              "timestamp": { "type": "number" }
+            }
+          }
+        }
+      },
+      "required": ["title", "lastMessageAt", "messages"]
+    },
     "FlashcardSet": {
       "title": "Flashcard Set",
       "description": "A set of generated flashcards for a specific topic.",
@@ -74,6 +96,10 @@
     "/users/{userId}/sessions/{sessionId}": {
       "schema": "QuizSession",
       "description": "Stores quiz sessions and results."
+    },
+    "/users/{userId}/tutorChats/{chatId}": {
+      "schema": "TutorChat",
+      "description": "Stores AI Tutor chat histories."
     },
     "/users/{userId}/flashcards/{flashcardId}": {
       "schema": "FlashcardSet",

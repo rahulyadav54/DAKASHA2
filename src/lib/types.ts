@@ -1,3 +1,4 @@
+
 import { QuestionGenerationOutput } from "@/ai/flows/ai-question-generator";
 
 export type Role = 'Student' | 'Teacher' | 'Parent' | 'Admin';
@@ -34,6 +35,18 @@ export interface AnswerEvaluation {
   score: number;
   feedback: string;
   suggestions: string;
+}
+
+export interface TutorChatHistory {
+  id: string;
+  title: string;
+  sessionId?: string;
+  lastMessageAt: number;
+  messages: {
+    role: 'user' | 'model';
+    text: string;
+    timestamp: number;
+  }[];
 }
 
 export interface StudentProgress {
