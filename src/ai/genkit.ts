@@ -4,7 +4,7 @@ import {googleAI} from '@genkit-ai/google-genai';
 
 /**
  * Initializes Genkit with the Google AI plugin.
- * It looks for GOOGLE_GENAI_API_KEY in the environment.
+ * It uses the API key provided in the environment variables.
  */
 export const ai = genkit({
   plugins: [
