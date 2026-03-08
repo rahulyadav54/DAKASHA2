@@ -9,7 +9,7 @@ import { getFirestore } from 'firebase/firestore';
  * Verified and updated with user-provided credentials.
  */
 const firebaseConfig = {
-  apiKey: "AIzaSyA9uBFfFyapsuEJvYSOkG28iAO4quQSS4M",
+  apiKey: "AIzaSyBlNohJjTsQweb1wy06wxWqAU5iXP8HrFU",
   authDomain: "ramiyaa-ff272.firebaseapp.com",
   projectId: "ramiyaa-ff272",
   storageBucket: "ramiyaa-ff272.firebasestorage.app",
