@@ -29,6 +29,38 @@
         }
       },
       "required": ["title", "content", "timestamp", "questions"]
+    },
+    "FlashcardSet": {
+      "title": "Flashcard Set",
+      "description": "A set of generated flashcards for a specific topic.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "cards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "term": { "type": "string" },
+              "definition": { "type": "string" }
+            }
+          }
+        },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["title", "cards", "timestamp"]
+    },
+    "Achievement": {
+      "title": "Achievement",
+      "description": "A milestone reached by the student.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "icon": { "type": "string" },
+        "unlockedAt": { "type": "number" }
+      },
+      "required": ["title", "description", "icon", "unlockedAt"]
     }
   },
   "auth": {
@@ -41,7 +73,15 @@
     },
     "/users/{userId}/sessions/{sessionId}": {
       "schema": "QuizSession",
-      "description": "Stores quiz sessions and results for a specific user."
+      "description": "Stores quiz sessions and results."
+    },
+    "/users/{userId}/flashcards/{flashcardId}": {
+      "schema": "FlashcardSet",
+      "description": "Stores generated flashcard sets."
+    },
+    "/users/{userId}/achievements/{achievementId}": {
+      "schema": "Achievement",
+      "description": "Stores unlocked achievements."
     }
   }
 }
