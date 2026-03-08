@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
@@ -14,18 +13,20 @@ import {
   History,
   Trash2,
   MessageCircle,
-  Plus
+  Plus,
+  User
 } from "lucide-react";
 import Link from "next/link";
 import { useUser, useCollection, useAuth, useDoc } from "@/firebase";
-import { collection, query, orderBy, addDoc, doc, updateDoc, deleteDoc, limit, Timestamp } from "firebase/firestore";
+import { collection, query, orderBy, addDoc, doc, updateDoc, deleteDoc, limit } from "firebase/firestore";
 import { tutorChat } from "@/ai/flows/ai-tutor-chat";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 export default function AiTutorPage() {
   const { user } = useUser();
@@ -38,36 +39,39 @@ export default function AiTutorPage() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | "none">("none");
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
 
-  // 1. Fetch User Sessions (for context)
+  // Fetch User Sessions for context
   const sessionsRef = useMemo(() => {
     if (!user || !firestore) return null;
     return query(collection(firestore, 'users', user.uid, 'sessions'), orderBy('timestamp', 'desc'), limit(10));
   }, [user, firestore]);
   const { data: sessions } = useCollection<any>(sessionsRef);
 
-  // 2. Fetch User Chat Histories
+  // Fetch User Chat Histories
   const chatsRef = useMemo(() => {
     if (!user || !firestore) return null;
     return query(collection(firestore, 'users', user.uid, 'tutorChats'), orderBy('lastMessageAt', 'desc'));
   }, [user, firestore]);
   const { data: chats, loading: chatsLoading } = useCollection<any>(chatsRef);
 
-  // 3. Fetch Active Chat Details
+  // Fetch Active Chat Details
   const activeChatPath = useMemo(() => {
     if (!user || !activeChatId) return null;
     return `users/${user.uid}/tutorChats/${activeChatId}`;
   }, [user, activeChatId]);
   const { data: activeChat } = useDoc<any>(activeChatPath);
 
-  // 4. Get Content of Selected Session for context
+  // Get Content of Selected Session
   const selectedSession = sessions?.find(s => s.id === selectedSessionId);
 
-  // Auto-scroll to bottom of chat
+  // Auto-scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTo(0, scrollRef.current.scrollHeight);
+      const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
     }
-  }, [activeChat?.messages]);
+  }, [activeChat?.messages, sending]);
 
   const handleStartNewChat = async () => {
     if (!user || !firestore) return;
@@ -77,14 +81,20 @@ export default function AiTutorPage() {
       sessionId: selectedSessionId === "none" ? null : selectedSessionId,
       lastMessageAt: Date.now(),
       messages: [
-        { role: 'model', text: "Hello! I'm your SmartRead AI Tutor. How can I help you today?", timestamp: Date.now() }
+        { role: 'model', text: "Hello! I'm your SmartRead AI Tutor. How can I help you understand your reading material today?", timestamp: Date.now() }
       ]
     };
+
     try {
       const docRef = await addDoc(collection(firestore, 'users', user.uid, 'tutorChats'), newChat);
       setActiveChatId(docRef.id);
-    } catch (err) {
-      toast({ title: "Failed to start chat", variant: "destructive" });
+    } catch (err: any) {
+      const permissionError = new FirestorePermissionError({
+        path: `users/${user.uid}/tutorChats`,
+        operation: 'create',
+        requestResourceData: newChat,
+      });
+      errorEmitter.emit('permission-error', permissionError);
     }
   };
 
@@ -93,35 +103,41 @@ export default function AiTutorPage() {
     if (!input.trim() || sending || !user || !firestore || !activeChatId || !activeChat) return;
 
     const userMessage = { role: 'user' as const, text: input, timestamp: Date.now() };
-    const updatedMessages = [...activeChat.messages, userMessage];
+    const updatedMessages = [...(activeChat.messages || []), userMessage];
     
+    const chatRef = doc(firestore, 'users', user.uid, 'tutorChats', activeChatId);
+    const originalInput = input;
     setInput("");
     setSending(true);
 
     try {
-      // 1. Optimistic update local
-      const chatRef = doc(firestore, 'users', user.uid, 'tutorChats', activeChatId);
-      updateDoc(chatRef, { 
+      // Optimistic Update
+      await updateDoc(chatRef, { 
         messages: updatedMessages,
         lastMessageAt: Date.now()
       });
 
-      // 2. Call AI
+      // AI Call
       const aiResponse = await tutorChat({
-        message: input,
+        message: originalInput,
         history: activeChat.messages.map((m: any) => ({ role: m.role, text: m.text })),
         context: selectedSession?.content || ""
       });
 
-      // 3. Update with AI response
       const botMessage = { role: 'model' as const, text: aiResponse.response, timestamp: Date.now() };
-      updateDoc(chatRef, {
+      
+      await updateDoc(chatRef, {
         messages: [...updatedMessages, botMessage],
         lastMessageAt: Date.now()
       });
 
-    } catch (err) {
-      toast({ title: "Failed to get AI response", variant: "destructive" });
+    } catch (err: any) {
+      toast({ 
+        title: "Tutor error", 
+        description: "Failed to process message. Please check your connection.",
+        variant: "destructive" 
+      });
+      console.error(err);
     } finally {
       setSending(false);
     }
@@ -132,16 +148,15 @@ export default function AiTutorPage() {
     try {
       await deleteDoc(doc(firestore, 'users', user.uid, 'tutorChats', id));
       if (activeChatId === id) setActiveChatId(null);
-      toast({ title: "Chat deleted" });
-    } catch (err) {
-      toast({ title: "Failed to delete chat", variant: "destructive" });
+      toast({ title: "Chat removed" });
+    } catch (err: any) {
+      toast({ title: "Delete failed", variant: "destructive" });
     }
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="border-b bg-white p-4 sticky top-0 z-50">
+    <div className="min-h-screen bg-background flex flex-col h-screen overflow-hidden">
+      <header className="border-b bg-white p-4 shrink-0">
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" asChild><Link href="/dashboard"><ArrowLeft className="h-5 w-5" /></Link></Button>
@@ -171,9 +186,9 @@ export default function AiTutorPage() {
         </div>
       </header>
 
-      <main className="flex-1 container mx-auto p-4 flex flex-col md:flex-row gap-6 h-[calc(100vh-120px)] overflow-hidden">
-        {/* Sidebar - Chat History */}
-        <aside className="hidden md:flex w-72 flex-col gap-4 overflow-y-auto pr-2 border-r">
+      <main className="flex-1 container mx-auto p-4 flex gap-6 overflow-hidden">
+        {/* Sidebar - Desktop Only */}
+        <aside className="hidden md:flex w-72 flex-col gap-4 overflow-y-auto pr-2 border-r h-full">
           <div className="flex items-center gap-2 mb-2">
             <History className="h-4 w-4 text-muted-foreground" />
             <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Recent Chats</h3>
@@ -181,108 +196,134 @@ export default function AiTutorPage() {
           {chatsLoading ? (
             <div className="flex items-center justify-center py-10"><Loader2 className="animate-spin h-6 w-6" /></div>
           ) : chats && chats.length > 0 ? (
-            chats.map((chat: any) => (
-              <div key={chat.id} className="relative group">
-                <Button 
-                  variant={activeChatId === chat.id ? "secondary" : "ghost"} 
-                  className={cn("w-full justify-start text-left h-auto py-3 px-4 rounded-xl border flex flex-col items-start gap-1", activeChatId === chat.id && "border-primary/30")}
-                  onClick={() => setActiveChatId(chat.id)}
-                >
-                  <span className="font-bold text-sm truncate w-full">{chat.title}</span>
-                  <span className="text-[10px] text-muted-foreground">{new Date(chat.lastMessageAt).toLocaleDateString()}</span>
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive"
-                  onClick={(e) => { e.stopPropagation(); handleDeleteChat(chat.id); }}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            ))
+            <div className="space-y-3">
+              {chats.map((chat: any) => (
+                <div key={chat.id} className="relative group">
+                  <Button 
+                    variant={activeChatId === chat.id ? "secondary" : "ghost"} 
+                    className={cn(
+                      "w-full justify-start text-left h-auto py-3 px-4 rounded-xl border transition-all",
+                      activeChatId === chat.id ? "border-primary/40 bg-primary/5" : "border-transparent"
+                    )}
+                    onClick={() => setActiveChatId(chat.id)}
+                  >
+                    <div className="flex flex-col items-start gap-1 min-w-0 w-full">
+                      <span className="font-bold text-sm truncate w-full">{chat.title}</span>
+                      <span className="text-[10px] text-muted-foreground">{new Date(chat.lastMessageAt).toLocaleDateString()}</span>
+                    </div>
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive"
+                    onClick={(e) => { e.stopPropagation(); handleDeleteChat(chat.id); }}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
           ) : (
-            <p className="text-xs text-muted-foreground text-center py-10">No recent chats found.</p>
+            <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-xl">
+              <MessageCircle className="h-8 w-8 text-muted-foreground/30 mb-2" />
+              <p className="text-[10px] text-muted-foreground uppercase font-bold">No history</p>
+            </div>
           )}
         </aside>
 
         {/* Chat Interface */}
-        <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-md border overflow-hidden relative">
+        <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-xl border overflow-hidden h-full">
           {activeChatId ? (
             <>
-              {/* Chat Messages */}
-              <ScrollArea className="flex-1 p-4 md:p-6" viewportRef={scrollRef}>
-                <div className="space-y-6 max-w-3xl mx-auto">
-                  {activeChat?.messages.map((msg: any, idx: number) => (
-                    <div key={idx} className={cn("flex flex-col", msg.role === 'user' ? "items-end" : "items-start")}>
+              <ScrollArea className="flex-1" ref={scrollRef}>
+                <div className="p-4 md:p-8 space-y-6 max-w-3xl mx-auto pb-24">
+                  {activeChat?.messages?.map((msg: any, idx: number) => (
+                    <div key={idx} className={cn("flex gap-3", msg.role === 'user' ? "flex-row-reverse" : "flex-row")}>
                       <div className={cn(
-                        "max-w-[85%] md:max-w-[70%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed",
-                        msg.role === 'user' 
-                          ? "bg-primary text-primary-foreground rounded-tr-none" 
-                          : "bg-muted text-foreground rounded-tl-none border border-border"
+                        "h-8 w-8 rounded-full flex items-center justify-center shrink-0 shadow-sm",
+                        msg.role === 'user' ? "bg-primary" : "bg-accent"
                       )}>
-                        {msg.text}
+                        {msg.role === 'user' ? <User className="h-4 w-4 text-white" /> : <Bot className="h-4 w-4 text-white" />}
                       </div>
-                      <span className="text-[10px] text-muted-foreground mt-1 mx-2">
-                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
+                      <div className={cn("flex flex-col", msg.role === 'user' ? "items-end" : "items-start")}>
+                        <div className={cn(
+                          "p-4 rounded-2xl shadow-sm text-sm leading-relaxed whitespace-pre-wrap",
+                          msg.role === 'user' 
+                            ? "bg-primary text-primary-foreground rounded-tr-none" 
+                            : "bg-muted text-foreground rounded-tl-none border border-border"
+                        )}>
+                          {msg.text}
+                        </div>
+                        <span className="text-[9px] text-muted-foreground mt-1 px-1">
+                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
                     </div>
                   ))}
                   {sending && (
-                    <div className="flex items-start">
-                      <div className="bg-muted p-4 rounded-2xl rounded-tl-none border border-border flex items-center gap-3">
+                    <div className="flex gap-3 items-start animate-pulse">
+                      <div className="h-8 w-8 rounded-full bg-accent flex items-center justify-center shrink-0">
+                        <Bot className="h-4 w-4 text-white" />
+                      </div>
+                      <div className="bg-muted p-4 rounded-2xl rounded-tl-none border flex items-center gap-3">
                         <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                        <span className="text-sm italic">AI is thinking...</span>
+                        <span className="text-xs font-medium italic">Thinking...</span>
                       </div>
                     </div>
                   )}
                 </div>
               </ScrollArea>
 
-              {/* Chat Input */}
-              <CardFooter className="p-4 border-t bg-slate-50">
-                <form onSubmit={handleSendMessage} className="flex w-full gap-2 items-center">
+              <div className="p-4 border-t bg-slate-50/80 backdrop-blur-sm shrink-0">
+                <form onSubmit={handleSendMessage} className="flex w-full gap-2 items-center max-w-4xl mx-auto">
                   <Input 
-                    placeholder="Ask your tutor anything..." 
-                    className="flex-1 h-12 rounded-xl bg-white border-primary/20"
+                    placeholder="Type your question here..." 
+                    className="flex-1 h-12 rounded-xl bg-white border-primary/20 shadow-sm focus-visible:ring-primary/30"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     disabled={sending}
                   />
-                  <Button type="submit" size="icon" className="h-12 w-12 rounded-xl shadow-md" disabled={sending || !input.trim()}>
+                  <Button type="submit" size="icon" className="h-12 w-12 rounded-xl shadow-md transition-all active:scale-95" disabled={sending || !input.trim()}>
                     {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
                   </Button>
                 </form>
-              </CardFooter>
+                <p className="text-[10px] text-center text-muted-foreground mt-2">
+                  AI Tutor can make mistakes. Verify important information.
+                </p>
+              </div>
             </>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-               <div className="bg-primary/10 p-6 rounded-full mb-6">
-                 <Bot className="h-12 w-12 text-primary" />
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-gradient-to-b from-transparent to-primary/5">
+               <div className="bg-white p-8 rounded-3xl shadow-xl border mb-6 relative">
+                 <Bot className="h-16 w-16 text-primary animate-bounce" />
+                 <div className="absolute -top-2 -right-2">
+                   <Sparkles className="h-8 w-8 text-yellow-500 fill-yellow-500" />
+                 </div>
                </div>
-               <h2 className="text-2xl font-headline mb-3">Your AI Learning Companion</h2>
-               <p className="text-muted-foreground max-w-sm mb-8">
-                 Select a chat from the sidebar or start a new one to begin your personalized tutoring session.
+               <h2 className="text-3xl font-headline font-bold mb-3">Hello! I'm your AI Study Buddy.</h2>
+               <p className="text-muted-foreground max-w-md mb-10 text-lg leading-relaxed">
+                 Need a simple explanation of a complex topic? Or help understanding a specific reading session? I'm here to help 24/7.
                </p>
-               <Button size="lg" onClick={handleStartNewChat} className="rounded-xl gap-2 shadow-lg">
-                 <Sparkles className="h-5 w-5" /> Start First Tutoring Session
+               <Button size="lg" onClick={handleStartNewChat} className="rounded-2xl h-14 px-10 text-lg gap-3 shadow-lg hover:shadow-primary/20 transition-all active:scale-95">
+                 <MessageCircle className="h-6 w-6" /> Start First Chat
                </Button>
                
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-12 w-full max-w-lg">
-                 <Card className="bg-accent/5 border-none shadow-sm">
-                   <CardContent className="pt-6">
-                     <BookOpen className="h-5 w-5 text-accent mb-2" />
-                     <h3 className="font-bold text-sm mb-1">Context Aware</h3>
-                     <p className="text-xs text-muted-foreground">Tutor knows what you're studying if you pick a session.</p>
-                   </CardContent>
-                 </Card>
-                 <Card className="bg-accent/5 border-none shadow-sm">
-                   <CardContent className="pt-6">
-                     <MessageCircle className="h-5 w-5 text-accent mb-2" />
-                     <h3 className="font-bold text-sm mb-1">Explain Anything</h3>
-                     <p className="text-xs text-muted-foreground">Ask for simplified explanations or detailed deep dives.</p>
-                   </CardContent>
-                 </Card>
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-16 w-full max-w-3xl">
+                 <div className="p-4 rounded-2xl bg-white shadow-sm border text-center">
+                    <BookOpen className="h-6 w-6 text-primary mx-auto mb-2" />
+                    <h4 className="font-bold text-xs uppercase tracking-wider mb-1">Contextual</h4>
+                    <p className="text-[10px] text-muted-foreground">References your specific quiz readings.</p>
+                 </div>
+                 <div className="p-4 rounded-2xl bg-white shadow-sm border text-center">
+                    <Sparkles className="h-6 w-6 text-yellow-500 mx-auto mb-2" />
+                    <h4 className="font-bold text-xs uppercase tracking-wider mb-1">Adaptive</h4>
+                    <p className="text-[10px] text-muted-foreground">Explanations tuned to your level.</p>
+                 </div>
+                 <div className="p-4 rounded-2xl bg-white shadow-sm border text-center">
+                    <Plus className="h-6 w-6 text-green-500 mx-auto mb-2" />
+                    <h4 className="font-bold text-xs uppercase tracking-wider mb-1">Always On</h4>
+                    <p className="text-[10px] text-muted-foreground">Get help whenever you're stuck.</p>
+                 </div>
                </div>
             </div>
           )}
