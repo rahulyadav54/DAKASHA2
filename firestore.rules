@@ -1,13 +1,25 @@
 rules_version = '2';
+
+/**
+ * Firestore Security Rules for SmartRead AI.
+ * Updated to ensure recursive access for all user-owned data.
+ */
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Explicitly allow users full access to their own profile and all sub-collections
+    
+    // Allow users full access to their own profile and all nested sub-collections
+    // (sessions, tutorChats, flashcards, achievements, etc.)
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
       
       match /{allPaths=**} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
+    }
+    
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
