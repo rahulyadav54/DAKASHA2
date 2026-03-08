@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -40,17 +39,27 @@ export default function QuizSessionPage() {
     return `users/${user.uid}/sessions/${id}`;
   }, [user, id]);
 
-  const { data: session, loading: sessionLoading } = useDoc(sessionRefStr);
+  const { data: session, loading: sessionLoading } = useDoc<any>(sessionRefStr);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("question");
 
   useEffect(() => {
-    if (!sessionLoading && !session) {
+    if (!sessionLoading && !session && sessionRefStr) {
       router.push('/dashboard');
     }
-  }, [session, sessionLoading, router]);
+  }, [session, sessionLoading, router, sessionRefStr]);
+
+  const allQuestions = useMemo(() => {
+    if (!session?.questions) return [];
+    return [
+      ...(session.questions.multipleChoiceQuestions || []).map((q: any) => ({ ...q, type: 'mcq' })),
+      ...(session.questions.trueFalseQuestions || []).map((q: any) => ({ ...q, type: 'tf' })),
+      ...(session.questions.fillInTheBlanksQuestions || []).map((q: any) => ({ ...q, type: 'fitb' })),
+      ...(session.questions.shortAnswerQuestions || []).map((q: any) => ({ ...q, type: 'sa' }))
+    ];
+  }, [session]);
 
   if (sessionLoading || !session) {
     return (
@@ -60,19 +69,12 @@ export default function QuizSessionPage() {
     );
   }
 
-  const allQuestions = [
-    ...(session.questions.multipleChoiceQuestions || []).map((q: any) => ({ ...q, type: 'mcq' })),
-    ...(session.questions.trueFalseQuestions || []).map((q: any) => ({ ...q, type: 'tf' })),
-    ...(session.questions.fillInTheBlanksQuestions || []).map((q: any) => ({ ...q, type: 'fitb' })),
-    ...(session.questions.shortAnswerQuestions || []).map((q: any) => ({ ...q, type: 'sa' }))
-  ];
-
   const totalSteps = allQuestions.length;
   const currentQuestion = allQuestions[currentIdx];
-  const progress = ((currentIdx + 1) / totalSteps) * 100;
+  const progress = totalSteps > 0 ? ((currentIdx + 1) / totalSteps) * 100 : 0;
 
   async function handleSubmit() {
-    if (!firestore || !user) return;
+    if (!firestore || !user || !session) return;
     setSubmitting(true);
     try {
       const evaluations: AnswerEvaluation[] = [];
@@ -80,18 +82,18 @@ export default function QuizSessionPage() {
 
       for (let i = 0; i < allQuestions.length; i++) {
         const q = allQuestions[i];
-        const studentAnswer = answers[i] || "";
+        const studentAnswer = (answers[i] || "").toString().trim();
         
         let evalResult;
         if (q.type === 'sa') {
           evalResult = await semanticAnswerEvaluator({
             question: q.question as string,
-            correctAnswer: q.referenceAnswer,
+            correctAnswer: q.referenceAnswer || "",
             studentAnswer,
-            context: session!.content
+            context: session.content || ""
           });
         } else if (q.type === 'tf') {
-          const isTrueValue = q.isTrue?.toString().toLowerCase();
+          const isTrueValue = (q.isTrue ?? "").toString().toLowerCase();
           const isCorrect = studentAnswer.toLowerCase() === isTrueValue;
           evalResult = {
             correctnessScore: isCorrect ? 100 : 0,
@@ -99,7 +101,7 @@ export default function QuizSessionPage() {
             suggestionsForImprovement: ""
           };
         } else {
-          const correctAnswerText = q.correctAnswer?.toString().toLowerCase().trim() || "";
+          const correctAnswerText = (q.correctAnswer ?? "").toString().toLowerCase().trim();
           const isCorrect = studentAnswer.toLowerCase().trim() === correctAnswerText;
           evalResult = {
             correctnessScore: isCorrect ? 100 : 0,
@@ -110,9 +112,9 @@ export default function QuizSessionPage() {
 
         evaluations.push({
           questionId: i.toString(),
-          questionText: q.question || q.sentenceWithBlank,
+          questionText: q.question || q.sentenceWithBlank || "Unknown Question",
           studentAnswer,
-          correctAnswer: q.correctAnswer?.toString() || q.referenceAnswer || q.isTrue?.toString(),
+          correctAnswer: (q.correctAnswer ?? q.referenceAnswer ?? q.isTrue ?? "").toString(),
           isCorrect: evalResult.correctnessScore > 70,
           score: evalResult.correctnessScore,
           feedback: evalResult.explanationFeedback,
@@ -123,7 +125,7 @@ export default function QuizSessionPage() {
       }
 
       const results: QuizResult = {
-        score: Math.round(totalScore / allQuestions.length),
+        score: allQuestions.length > 0 ? Math.round(totalScore / allQuestions.length) : 0,
         totalQuestions: allQuestions.length,
         evaluations,
         feedback: "Assessment complete."
@@ -156,18 +158,27 @@ export default function QuizSessionPage() {
     setAnswers({ ...answers, [currentIdx]: val });
   };
 
+  if (totalSteps === 0) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+        <h1 className="text-xl font-bold mb-4">No questions found in this session.</h1>
+        <Button onClick={() => router.push('/dashboard')}>Back to Dashboard</Button>
+      </div>
+    );
+  }
+
   const QuizContent = (
     <Card className="flex-1 shadow-md border-primary/20 flex flex-col min-h-[400px]">
       <CardHeader className="border-b pb-4">
          <CardTitle className="text-lg md:text-xl font-headline leading-tight">
-           {currentQuestion.question || currentQuestion.sentenceWithBlank}
+           {currentQuestion?.question || currentQuestion?.sentenceWithBlank || "Question missing"}
          </CardTitle>
       </CardHeader>
 
       <CardContent className="flex-1 pt-6 md:pt-8">
         {currentQuestion.type === 'mcq' && (
           <RadioGroup value={answers[currentIdx] || ""} onValueChange={setAnswer} className="space-y-3">
-            {currentQuestion.options.map((opt: string, i: number) => (
+            {(currentQuestion.options || []).map((opt: string, i: number) => (
               <div key={i} onClick={() => setAnswer(opt)} className={`flex items-center space-x-3 p-3 md:p-4 rounded-xl border-2 cursor-pointer transition-colors ${answers[currentIdx] === opt ? 'border-primary bg-primary/5' : 'border-transparent bg-muted'}`}>
                 <RadioGroupItem value={opt} id={`opt-${i}`} />
                 <Label htmlFor={`opt-${i}`} className="flex-1 text-sm md:text-base cursor-pointer">{opt}</Label>
@@ -201,7 +212,7 @@ export default function QuizSessionPage() {
           <ChevronLeft className="h-4 w-4 mr-2" /> Previous
         </Button>
         <Button size={isMobile ? "sm" : "default"} onClick={handleNext} disabled={submitting || !answers[currentIdx]}>
-          {submitting ? <Loader2 className="animate-spin" /> : currentIdx === totalSteps - 1 ? 'Finish' : 'Next'}
+          {submitting ? <Loader2 className="animate-spin h-4 w-4" /> : currentIdx === totalSteps - 1 ? 'Finish' : 'Next'}
         </Button>
       </CardFooter>
     </Card>
@@ -215,7 +226,7 @@ export default function QuizSessionPage() {
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 overflow-auto p-4 md:p-6 font-body whitespace-pre-wrap text-sm md:text-base leading-relaxed">
-         {session.content}
+         {session.content || "No content available."}
       </CardContent>
     </Card>
   );

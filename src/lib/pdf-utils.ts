@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as pdfjsLib from 'pdfjs-dist';
@@ -12,20 +11,25 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs
  * @returns A promise that resolves to the extracted text.
  */
 export async function extractTextFromPdf(file: File): Promise<string> {
-  const arrayBuffer = await file.arrayBuffer();
-  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-  
-  const pdf = await loadingTask.promise;
-  let fullText = '';
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    
+    const pdf = await loadingTask.promise;
+    let fullText = '';
 
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const textContent = await page.getTextContent();
-    const pageText = textContent.items
-      .map((item: any) => item.str)
-      .join(' ');
-    fullText += pageText + '\n';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: any) => item.str || '') // Safety check for str
+        .join(' ');
+      fullText += pageText + '\n';
+    }
+
+    return fullText.trim() || "No text could be extracted from this document.";
+  } catch (error) {
+    console.error("PDF Extraction error:", error);
+    throw new Error("Could not extract text from PDF.");
   }
-
-  return fullText.trim();
 }
