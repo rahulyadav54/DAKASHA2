@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BrainCircuit, Upload, FileText, Loader2, Sparkles, ArrowLeft, FileType } from "lucide-react";
+import { BrainCircuit, Upload, FileText, Loader2, Sparkles, ArrowLeft, FileType, AlertCircle } from "lucide-react";
 import { generateQuestions } from "@/ai/flows/ai-question-generator";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -17,6 +17,7 @@ import { useAuth, useUser } from "@/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function NewQuizPage() {
   const [content, setContent] = useState("");
@@ -24,6 +25,7 @@ export default function NewQuizPage() {
   const [loading, setLoading] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [fileName, setFileName] = useState("");
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { toast } = useToast();
@@ -45,6 +47,7 @@ export default function NewQuizPage() {
 
     setParsing(true);
     setFileName(file.name);
+    setErrorDetails(null);
     try {
       const text = await extractTextFromPdf(file);
       if (text.length < 50) {
@@ -79,9 +82,15 @@ export default function NewQuizPage() {
     }
 
     setLoading(true);
+    setErrorDetails(null);
     try {
+      // 1. Generate questions using AI
       const questions = await generateQuestions({ content });
       
+      if (!questions || (!questions.multipleChoiceQuestions.length && !questions.shortAnswerQuestions.length)) {
+        throw new Error("AI failed to generate valid questions. Please try different content.");
+      }
+
       const sessionId = Math.random().toString(36).substr(2, 9);
       const sessionRef = doc(firestore, 'users', user.uid, 'sessions', sessionId);
 
@@ -93,22 +102,29 @@ export default function NewQuizPage() {
         timestamp: Date.now()
       };
 
-      setDoc(sessionRef, newSession)
-        .catch(async (err) => {
-          const permissionError = new FirestorePermissionError({
-            path: sessionRef.path,
-            operation: 'create',
-            requestResourceData: newSession,
-          });
-          errorEmitter.emit('permission-error', permissionError);
+      // 2. Save to Firestore and WAIT for success
+      try {
+        await setDoc(sessionRef, newSession);
+        // 3. Only redirect after successful save
+        router.push(`/quiz/${sessionId}`);
+      } catch (err: any) {
+        console.error("Firestore Save Error:", err);
+        const permissionError = new FirestorePermissionError({
+          path: sessionRef.path,
+          operation: 'create',
+          requestResourceData: newSession,
         });
+        errorEmitter.emit('permission-error', permissionError);
+        throw new Error("Failed to save the quiz to your account. Check your database permissions.");
+      }
 
-      router.push(`/quiz/${sessionId}`);
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      console.error("Quiz Generation Error:", error);
+      const msg = error?.message || "There was an error generating your quiz.";
+      setErrorDetails(msg);
       toast({
         title: "Generation failed",
-        description: "There was an error generating your quiz. Please try again.",
+        description: msg,
         variant: "destructive"
       });
     } finally {
@@ -139,6 +155,16 @@ export default function NewQuizPage() {
           
           <CardContent className="p-8">
             <div className="space-y-8">
+              {errorDetails && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>
+                    {errorDetails}
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="title" className="text-sm font-semibold">Quiz Title</Label>
                 <Input 

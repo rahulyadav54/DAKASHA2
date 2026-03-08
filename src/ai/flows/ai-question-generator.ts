@@ -6,15 +6,12 @@
  *
  * - generateQuestions - A function that handles the question generation process.
  * - QuestionGenerationInput - The input type for the generateQuestions function.
- * - QuestionGenerationOutput - The return type for the generateQuestions function.
+ * - QuestionGenerationOutput - The return type for the question generator flow.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-/**
- * @deprecated Please use QuestionGenerationInputSchema instead.
- */
 const QuestionGenerationInputSchema = z.object({
   content: z
     .string()
@@ -26,6 +23,7 @@ const MultipleChoiceQuestionSchema = z.object({
   question: z.string().describe('The multiple-choice question text.'),
   options: z
     .array(z.string())
+    .min(2)
     .describe('An array of possible answer options for the MCQ.'),
   correctAnswer: z.string().describe('The correct answer among the options.'),
 });
@@ -83,18 +81,20 @@ const questionGenerationPrompt = ai.definePrompt({
   output: {schema: QuestionGenerationOutputSchema},
   prompt: `You are an expert educational assistant tasked with generating a variety of comprehension questions from provided text content.
 
-Generate questions of the following types:
-- Multiple Choice Questions (MCQ)
-- Short Answer Questions
-- True/False Questions
-- Fill-in-the-blanks Questions
+Generate a comprehensive set of questions:
+- At least 3 Multiple Choice Questions (MCQ)
+- At least 2 Short Answer Questions
+- At least 2 True/False Questions
+- At least 2 Fill-in-the-blanks Questions
 
 Ensure the questions are contextually relevant to the provided content and cover key concepts.
-For fill-in-the-blanks, use '____' to indicate the blank.
+For fill-in-the-blanks, use '____' to indicate the blank clearly within the sentence.
+Always provide correct answers for all question types.
 
 Content:
 {{content}}
-`,
+
+The response must be a valid JSON object strictly following the output schema.`,
 });
 
 const questionGeneratorFlow = ai.defineFlow(
@@ -105,6 +105,9 @@ const questionGeneratorFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await questionGenerationPrompt(input);
-    return output!;
+    if (!output) {
+      throw new Error("The AI model returned an empty response. This might be due to safety filters or an invalid API key.");
+    }
+    return output;
   }
 );

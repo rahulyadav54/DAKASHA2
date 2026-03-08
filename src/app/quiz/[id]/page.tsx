@@ -134,21 +134,27 @@ export default function QuizSessionPage() {
       };
 
       const docRef = doc(firestore, 'users', user.uid, 'sessions', id as string);
-      updateDoc(docRef, { results })
-        .catch(async (err) => {
-          const permissionError = new FirestorePermissionError({
-            path: docRef.path,
-            operation: 'update',
-            requestResourceData: { results },
-          });
-          errorEmitter.emit('permission-error', permissionError);
+      
+      try {
+        // Await the update before redirecting
+        await updateDoc(docRef, { results });
+        router.push(`/quiz/${id}/results`);
+      } catch (err: any) {
+        console.error("Firestore Update Error:", err);
+        const permissionError = new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'update',
+          requestResourceData: { results },
         });
+        errorEmitter.emit('permission-error', permissionError);
+        throw new Error("Failed to save results. Check your database permissions.");
+      }
 
-      router.push(`/quiz/${id}/results`);
     } catch (error) {
       console.error(error);
       toast({
         title: "Submission failed",
+        description: "There was a problem grading your quiz. Please try again.",
         variant: "destructive"
       });
     } finally {
