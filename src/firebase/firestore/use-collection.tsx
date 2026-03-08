@@ -8,6 +8,8 @@ import {
   DocumentData,
   FirestoreError,
 } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 export function useCollection<T = DocumentData>(query: Query<T> | null) {
   const [data, setData] = useState<T[] | null>(null);
@@ -31,8 +33,12 @@ export function useCollection<T = DocumentData>(query: Query<T> | null) {
         setData(items);
         setLoading(false);
       },
-      (err) => {
-        console.error(err);
+      async (err) => {
+        const permissionError = new FirestorePermissionError({
+          path: (query as any)._query?.path?.toString() || 'unknown',
+          operation: 'list',
+        });
+        errorEmitter.emit('permission-error', permissionError);
         setError(err);
         setLoading(false);
       }

@@ -25,6 +25,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useUser, useDoc, useAuth } from "@/firebase";
 import { doc, updateDoc } from "firebase/firestore";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 export default function QuizSessionPage() {
   const { id } = useParams();
@@ -115,13 +117,13 @@ export default function QuizSessionPage() {
           questionText: q.question || q.sentenceWithBlank || "Unknown Question",
           studentAnswer,
           correctAnswer: (q.correctAnswer ?? q.referenceAnswer ?? q.isTrue ?? "").toString(),
-          isCorrect: evalResult.correctnessScore > 70,
-          score: evalResult.correctnessScore,
-          feedback: evalResult.explanationFeedback,
-          suggestions: evalResult.suggestionsForImprovement
+          isCorrect: (evalResult?.correctnessScore || 0) > 70,
+          score: evalResult?.correctnessScore || 0,
+          feedback: evalResult?.explanationFeedback || "",
+          suggestions: evalResult?.suggestionsForImprovement || ""
         });
 
-        totalScore += evalResult.correctnessScore;
+        totalScore += evalResult?.correctnessScore || 0;
       }
 
       const results: QuizResult = {
@@ -132,7 +134,16 @@ export default function QuizSessionPage() {
       };
 
       const docRef = doc(firestore, 'users', user.uid, 'sessions', id as string);
-      updateDoc(docRef, { results });
+      updateDoc(docRef, { results })
+        .catch(async (err) => {
+          const permissionError = new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'update',
+            requestResourceData: { results },
+          });
+          errorEmitter.emit('permission-error', permissionError);
+        });
+
       router.push(`/quiz/${id}/results`);
     } catch (error) {
       console.error(error);

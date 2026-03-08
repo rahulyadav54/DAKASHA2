@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,7 +14,9 @@ import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { extractTextFromPdf } from "@/lib/pdf-utils";
 import { useAuth, useUser } from "@/firebase";
-import { collection, doc, setDoc } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 export default function NewQuizPage() {
   const [content, setContent] = useState("");
@@ -92,8 +93,16 @@ export default function NewQuizPage() {
         timestamp: Date.now()
       };
 
-      // Optimistic write
-      setDoc(sessionRef, newSession);
+      setDoc(sessionRef, newSession)
+        .catch(async (err) => {
+          const permissionError = new FirestorePermissionError({
+            path: sessionRef.path,
+            operation: 'create',
+            requestResourceData: newSession,
+          });
+          errorEmitter.emit('permission-error', permissionError);
+        });
+
       router.push(`/quiz/${sessionId}`);
     } catch (error) {
       console.error(error);
