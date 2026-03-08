@@ -70,10 +70,19 @@ export default function QuizSessionPage() {
             studentAnswer,
             context: session!.content
           });
+        } else if (q.type === 'tf') {
+          // Explicit Boolean comparison for True/False
+          const isTrueValue = (q as any).isTrue?.toString().toLowerCase();
+          const isCorrect = studentAnswer.toLowerCase() === isTrueValue;
+          evalResult = {
+            correctnessScore: isCorrect ? 100 : 0,
+            explanationFeedback: isCorrect ? "Perfect! Your answer matches the expected content." : "Not quite. Check the reference answer.",
+            suggestionsForImprovement: isCorrect ? "" : "Try to revisit the passage section specifically discussing this point."
+          };
         } else {
-          // Simple string matching for others
-          const isCorrect = studentAnswer.toLowerCase().trim() === (q as any).correctAnswer?.toString().toLowerCase().trim() || 
-                           (q.type === 'tf' && studentAnswer === (q as any).isTrue?.toString());
+          // Simple string matching for MCQ and FITB
+          const correctAnswerText = (q as any).correctAnswer?.toString().toLowerCase().trim() || "";
+          const isCorrect = studentAnswer.toLowerCase().trim() === correctAnswerText;
           evalResult = {
             correctnessScore: isCorrect ? 100 : 0,
             explanationFeedback: isCorrect ? "Perfect! Your answer matches the expected content." : "Not quite. Check the reference answer.",
@@ -194,7 +203,11 @@ export default function QuizSessionPage() {
                   className="space-y-3"
                 >
                   {(currentQuestion as any).options.map((opt: string, i: number) => (
-                    <div key={i} className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-all ${answers[currentIdx] === opt ? 'border-primary bg-primary/5' : 'border-transparent bg-background hover:bg-muted'}`}>
+                    <div 
+                      key={i} 
+                      onClick={() => setAnswer(opt)}
+                      className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${answers[currentIdx] === opt ? 'border-primary bg-primary/5' : 'border-transparent bg-background hover:bg-muted'}`}
+                    >
                       <RadioGroupItem value={opt} id={`opt-${i}`} />
                       <Label htmlFor={`opt-${i}`} className="flex-1 text-base cursor-pointer">{opt}</Label>
                     </div>
@@ -209,7 +222,11 @@ export default function QuizSessionPage() {
                   className="grid grid-cols-2 gap-4"
                 >
                   {['true', 'false'].map((opt) => (
-                    <div key={opt} className={`flex flex-col items-center justify-center p-8 rounded-xl border-2 transition-all cursor-pointer ${answers[currentIdx] === opt ? 'border-primary bg-primary/5' : 'border-transparent bg-background hover:bg-muted'}`}>
+                    <div 
+                      key={opt} 
+                      onClick={() => setAnswer(opt)}
+                      className={`flex flex-col items-center justify-center p-8 rounded-xl border-2 transition-all cursor-pointer ${answers[currentIdx] === opt ? 'border-primary bg-primary/5' : 'border-transparent bg-background hover:bg-muted'}`}
+                    >
                       <RadioGroupItem value={opt} id={`tf-${opt}`} className="sr-only" />
                       <Label htmlFor={`tf-${opt}`} className="text-lg font-bold capitalize cursor-pointer">{opt}</Label>
                     </div>
