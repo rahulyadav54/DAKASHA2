@@ -2,10 +2,29 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BookOpen, TrendingUp, Calendar, LayoutDashboard, LogOut, Settings, Award, Loader2, Menu, X, Plus } from "lucide-react";
+import { 
+  BookOpen, 
+  TrendingUp, 
+  Calendar, 
+  LayoutDashboard, 
+  LogOut, 
+  Settings, 
+  Award, 
+  Loader2, 
+  Menu, 
+  X, 
+  Plus,
+  PencilLine,
+  Timer,
+  Library,
+  Bot,
+  BookOpenText,
+  Users,
+  Trophy
+} from "lucide-react";
 import Link from "next/link";
 import { Progress } from "@/components/ui/progress";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -14,9 +33,11 @@ import { collection, query, orderBy } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 
 export default function DashboardPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const { auth, firestore } = useAuth();
   const { user, loading: userLoading } = useUser();
   const isMobile = useIsMobile();
@@ -68,29 +89,61 @@ export default function DashboardPage() {
     }
   };
 
+  const NavItem = ({ href, icon: Icon, label }: { href: string, icon: any, label: string }) => {
+    const active = pathname === href;
+    return (
+      <Link 
+        href={href} 
+        className={cn(
+          "flex items-center gap-3 px-3 py-3 rounded-xl border transition-all duration-200 group mb-2 bg-white",
+          active 
+            ? "border-primary bg-primary/5 text-primary shadow-sm" 
+            : "border-transparent text-muted-foreground hover:bg-accent/5 hover:text-foreground"
+        )}
+      >
+        <div className={cn(
+          "h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0",
+          active ? "border-primary bg-primary" : "border-muted group-hover:border-primary/50"
+        )}>
+          {active && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+        </div>
+        <Icon className="h-4 w-4" />
+        <span className="font-medium text-sm">{label}</span>
+      </Link>
+    );
+  };
+
   const NavContent = (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 mb-10 px-3">
-        <BookOpen className="h-6 w-6 text-primary" />
+    <div className="flex flex-col h-full overflow-y-auto">
+      <div className="flex items-center gap-2 mb-8 px-3 pt-4">
+        <div className="bg-primary p-2 rounded-lg">
+          <Bot className="h-5 w-5 text-white" />
+        </div>
         <span className="font-headline font-bold text-lg text-primary">SmartRead AI</span>
       </div>
       
-      <nav className="flex-1 space-y-1">
-        <Link href="/dashboard" className="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 text-primary font-medium">
-          <LayoutDashboard className="h-4 w-4" />
-          Dashboard
-        </Link>
-        <Link href="/quiz/new" className="flex items-center gap-3 px-3 py-2 rounded-lg text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-colors">
-          <BookOpen className="h-4 w-4" />
-          New Quiz
-        </Link>
-        <Link href="/settings" className="flex items-center gap-3 px-3 py-2 rounded-lg text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-colors">
-          <Settings className="h-4 w-4" />
-          Settings
-        </Link>
+      <nav className="flex-1 px-1">
+        <NavItem href="/quiz/new" icon={PencilLine} label="Take Quiz" />
+        <NavItem href="/quiz/speed" icon={Timer} label="Speed Quiz" />
+        <NavItem href="/study/flashcards" icon={Library} label="Flashcards" />
+        <NavItem href="/study/tutor" icon={Bot} label="AI Tutor" />
+        <NavItem href="/study/guide" icon={BookOpenText} label="Study Guide" />
+        <NavItem href="/parent" icon={Users} label="Parent Portal" />
+        <NavItem href="/achievements" icon={Trophy} label="Achievements" />
+        <NavItem href="/dashboard" icon={LayoutDashboard} label="Dashboard" />
+        
+        <div className="mt-4 pt-4 border-t px-3">
+          <p className="text-[10px] font-bold text-muted-foreground uppercase mb-4 tracking-wider">Account</p>
+          <Link href="/settings" className={cn(
+            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+            pathname === '/settings' ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent/5 hover:text-foreground"
+          )}>
+            <Settings className="h-4 w-4" /> Settings
+          </Link>
+        </div>
       </nav>
 
-      <div className="pt-6 border-t mt-6 space-y-1">
+      <div className="pt-6 border-t mt-6 pb-6 px-1">
         <Button variant="ghost" className="w-full justify-start gap-3 px-3 text-muted-foreground hover:text-destructive" onClick={handleLogout}>
           <LogOut className="h-4 w-4" />
           Sign Out
@@ -103,7 +156,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-background flex flex-col md:flex-row">
       {/* Sidebar - Desktop */}
       {!isMobile && (
-        <aside className="w-64 border-r bg-white p-6 flex flex-col shrink-0 sticky top-0 h-screen">
+        <aside className="w-64 border-r bg-white p-4 flex flex-col shrink-0 sticky top-0 h-screen">
           {NavContent}
         </aside>
       )}
@@ -112,7 +165,7 @@ export default function DashboardPage() {
       {isMobile && (
         <header className="bg-white border-b p-4 flex items-center justify-between sticky top-0 z-40">
           <div className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-primary" />
+            <Bot className="h-5 w-5 text-primary" />
             <span className="font-headline font-bold text-sm text-primary">SmartRead AI</span>
           </div>
           <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
@@ -121,7 +174,7 @@ export default function DashboardPage() {
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-72 p-6">
+            <SheetContent side="left" className="w-72 p-4">
               {NavContent}
             </SheetContent>
           </Sheet>
