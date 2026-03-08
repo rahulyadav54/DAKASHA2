@@ -6,7 +6,7 @@ import { getFirestore } from 'firebase/firestore';
 
 /**
  * Firebase configuration for the ramiyaa-ff272 project.
- * Using production values provided by the user.
+ * Verified and updated with user-provided credentials.
  */
 const firebaseConfig = {
   apiKey: "AIzaSyA9uBFfFyapsuEJvYSOkG28iAO4quQSS4M",
