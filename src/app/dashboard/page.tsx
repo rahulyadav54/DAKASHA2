@@ -16,19 +16,29 @@ export default function DashboardPage() {
   const router = useRouter();
 
   useEffect(() => {
-    setUser(store.getCurrentUser());
-  }, []);
+    const currentUser = store.getCurrentUser();
+    if (!currentUser) {
+      router.push('/login');
+    } else {
+      setUser(currentUser);
+    }
+  }, [router]);
 
   if (!user) return null;
 
   const sessions = store.getSessions().filter(s => !!s.results);
-  const recentSessions = sessions.slice(-3).reverse();
+  const recentSessions = [...sessions].reverse().slice(0, 3);
   const avgScore = sessions.length ? Math.round(sessions.reduce((acc, s) => acc + (s.results?.score || 0), 0) / sessions.length) : 0;
 
   const chartData = sessions.map(s => ({
     name: new Date(s.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' }),
     score: s.results?.score || 0
   }));
+
+  const handleLogout = () => {
+    store.logout();
+    router.push('/');
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row">
@@ -63,7 +73,7 @@ export default function DashboardPage() {
             <Settings className="h-4 w-4" />
             Settings
           </Link>
-          <Button variant="ghost" className="w-full justify-start gap-3 px-3 text-muted-foreground hover:text-destructive" onClick={() => router.push('/')}>
+          <Button variant="ghost" className="w-full justify-start gap-3 px-3 text-muted-foreground hover:text-destructive" onClick={handleLogout}>
             <LogOut className="h-4 w-4" />
             Sign Out
           </Button>
@@ -76,7 +86,7 @@ export default function DashboardPage() {
           <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div>
               <h1 className="text-3xl font-headline mb-1">Welcome back, {user.name}!</h1>
-              <p className="text-muted-foreground">Here's how your reading comprehension is improving.</p>
+              <p className="text-muted-foreground">You are currently set as a <strong>{user.role}</strong>.</p>
             </div>
             <Button size="lg" className="rounded-full gap-2" asChild>
               <Link href="/quiz/new">

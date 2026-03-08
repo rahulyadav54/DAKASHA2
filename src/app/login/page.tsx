@@ -8,17 +8,24 @@ import { BrainCircuit, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { store } from "@/lib/store";
 
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    
+    // Simulate API call
     setTimeout(() => {
+      store.login(name || email.split('@')[0], email);
+      setLoading(false);
       router.push('/dashboard');
-    }, 1000);
+    }, 800);
   };
 
   return (
@@ -31,20 +38,39 @@ export default function LoginPage() {
             </div>
           </div>
           <CardTitle className="text-2xl font-headline">Welcome back</CardTitle>
-          <CardDescription>Enter your credentials to access your tutor dashboard</CardDescription>
+          <CardDescription>Enter your details to access your tutor dashboard</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
+              <Label htmlFor="name">Full Name (Optional)</Label>
+              <Input 
+                id="name" 
+                type="text" 
+                placeholder="Alex Johnson" 
+                className="h-12" 
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="alex@example.com" required className="h-12" />
+              <Input 
+                id="email" 
+                type="email" 
+                placeholder="alex@example.com" 
+                required 
+                className="h-12" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
                 <Link href="#" className="text-xs text-primary hover:underline">Forgot password?</Link>
               </div>
-              <Input id="password" type="password" required className="h-12" />
+              <Input id="password" type="password" required className="h-12" defaultValue="password123" />
             </div>
             <Button type="submit" className="w-full h-12 text-lg rounded-xl mt-6" disabled={loading}>
               {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Sign In"}
