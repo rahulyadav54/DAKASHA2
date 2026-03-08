@@ -1,48 +1,82 @@
+
 "use client";
 
-import { useEffect, useState } from "react";
-import { store } from "@/lib/store";
-import { User } from "@/lib/types";
+import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BookOpen, TrendingUp, Calendar, LayoutDashboard, LogOut, Settings, Award } from "lucide-react";
+import { BookOpen, TrendingUp, Calendar, LayoutDashboard, LogOut, Settings, Award, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Progress } from "@/components/ui/progress";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useUser, useAuth, useCollection, useDoc } from "@/firebase";
+import { collection, query, orderBy, limit } from "firebase/firestore";
+import { signOut } from "firebase/auth";
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<User | null>(null);
   const router = useRouter();
+  const { auth } = useAuth();
+  const { user, loading: userLoading } = useUser();
+
+  const userProfileRef = useMemo(() => {
+    if (!user) return null;
+    return `users/${user.uid}`;
+  }, [user]);
+
+  const { data: profile } = useDoc(userProfileRef);
+
+  const sessionsQuery = useMemo(() => {
+    if (!user) return null;
+    return query(
+      collection(auth?.app.options.databaseURL ? auth?.app.options.databaseURL as any : 'unused' as any, 'users', user.uid, 'sessions'),
+      orderBy('timestamp', 'desc')
+    );
+  }, [user, auth]);
+
+  // Fallback for query if the above memo is tricky with direct collection calls
+  // Better use the standard Firestore instance
+  const { firestore } = useAuth();
+  const sessionsCollection = useMemo(() => {
+    if (!firestore || !user) return null;
+    return query(collection(firestore, 'users', user.uid, 'sessions'), orderBy('timestamp', 'desc'));
+  }, [firestore, user]);
+
+  const { data: sessions, loading: sessionsLoading } = useCollection(sessionsCollection);
 
   useEffect(() => {
-    const currentUser = store.getCurrentUser();
-    if (!currentUser) {
+    if (!userLoading && !user) {
       router.push('/login');
-    } else {
-      setUser(currentUser);
     }
-  }, [router]);
+  }, [user, userLoading, router]);
 
-  if (!user) return null;
+  if (userLoading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
-  const sessions = store.getSessions().filter(s => !!s.results);
-  const recentSessions = [...sessions].reverse().slice(0, 3);
-  const avgScore = sessions.length ? Math.round(sessions.reduce((acc, s) => acc + (s.results?.score || 0), 0) / sessions.length) : 0;
+  const completedSessions = sessions?.filter(s => !!s.results) || [];
+  const recentSessions = completedSessions.slice(0, 3);
+  const avgScore = completedSessions.length 
+    ? Math.round(completedSessions.reduce((acc, s) => acc + (s.results?.score || 0), 0) / completedSessions.length) 
+    : 0;
 
-  const chartData = sessions.map(s => ({
+  const chartData = [...completedSessions].reverse().map(s => ({
     name: new Date(s.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' }),
     score: s.results?.score || 0
   }));
 
-  const handleLogout = () => {
-    store.logout();
-    router.push('/');
+  const handleLogout = async () => {
+    if (auth) {
+      await signOut(auth);
+      router.push('/');
+    }
   };
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row">
-      {/* Sidebar Navigation */}
       <aside className="w-full md:w-64 border-r bg-white p-6 flex flex-col shrink-0">
         <div className="flex items-center gap-2 mb-10">
           <BookOpen className="h-6 w-6 text-primary" />
@@ -58,21 +92,13 @@ export default function DashboardPage() {
             <BookOpen className="h-4 w-4" />
             New Quiz
           </Link>
-          <Link href="/dashboard" className="flex items-center gap-3 px-3 py-2 rounded-lg text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-colors">
-            <Calendar className="h-4 w-4" />
-            History
-          </Link>
-          <Link href="/dashboard" className="flex items-center gap-3 px-3 py-2 rounded-lg text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-colors">
-            <TrendingUp className="h-4 w-4" />
-            Analytics
-          </Link>
-        </nav>
-
-        <div className="pt-6 border-t mt-6 space-y-1">
           <Link href="/settings" className="flex items-center gap-3 px-3 py-2 rounded-lg text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-colors">
             <Settings className="h-4 w-4" />
             Settings
           </Link>
+        </nav>
+
+        <div className="pt-6 border-t mt-6 space-y-1">
           <Button variant="ghost" className="w-full justify-start gap-3 px-3 text-muted-foreground hover:text-destructive" onClick={handleLogout}>
             <LogOut className="h-4 w-4" />
             Sign Out
@@ -80,13 +106,12 @@ export default function DashboardPage() {
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex-1 p-6 md:p-10 overflow-auto">
         <div className="max-w-6xl mx-auto">
           <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div>
-              <h1 className="text-3xl font-headline mb-1">Welcome back, {user.name}!</h1>
-              <p className="text-muted-foreground">You are currently set as a <strong>{user.role}</strong>.</p>
+              <h1 className="text-3xl font-headline mb-1">Welcome back, {profile?.name || user.displayName || 'Learner'}!</h1>
+              <p className="text-muted-foreground">You are currently set as a <strong>{profile?.role || 'Student'}</strong>.</p>
             </div>
             <Button size="lg" className="rounded-full gap-2" asChild>
               <Link href="/quiz/new">
@@ -96,7 +121,6 @@ export default function DashboardPage() {
             </Button>
           </header>
 
-          {/* Quick Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <Card>
               <CardContent className="pt-6">
@@ -119,7 +143,7 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Quizzes Taken</p>
-                    <h3 className="text-2xl font-bold">{sessions.length}</h3>
+                    <h3 className="text-2xl font-bold">{completedSessions.length}</h3>
                   </div>
                 </div>
               </CardContent>
@@ -131,8 +155,8 @@ export default function DashboardPage() {
                     <BookOpen className="h-6 w-6" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Reading Level</p>
-                    <h3 className="text-2xl font-bold">Grade 8</h3>
+                    <p className="text-sm font-medium text-muted-foreground">Role</p>
+                    <h3 className="text-2xl font-bold">{profile?.role || 'Student'}</h3>
                   </div>
                 </div>
               </CardContent>
@@ -144,8 +168,10 @@ export default function DashboardPage() {
                     <Calendar className="h-6 w-6" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Streak</p>
-                    <h3 className="text-2xl font-bold">4 Days</h3>
+                    <p className="text-sm font-medium text-muted-foreground">Last Quiz</p>
+                    <h3 className="text-2xl font-bold">
+                      {completedSessions[0] ? new Date(completedSessions[0].timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'N/A'}
+                    </h3>
                   </div>
                 </div>
               </CardContent>
@@ -153,14 +179,15 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Chart Area */}
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle className="font-headline">Score History</CardTitle>
                 <CardDescription>Your performance over time.</CardDescription>
               </CardHeader>
               <CardContent className="h-[300px] pt-4">
-                {sessions.length > 0 ? (
+                {sessionsLoading ? (
+                  <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin" /></div>
+                ) : completedSessions.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -178,7 +205,6 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            {/* Recent Quizzes */}
             <Card>
               <CardHeader>
                 <CardTitle className="font-headline">Recent Results</CardTitle>
@@ -187,14 +213,16 @@ export default function DashboardPage() {
               <CardContent className="space-y-6">
                 {recentSessions.length > 0 ? (
                   recentSessions.map((session) => (
-                    <div key={session.id} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold truncate max-w-[150px]">{session.title}</p>
-                        <span className="text-xs font-bold text-primary">{session.results?.score}%</span>
+                    <Link key={session.id} href={`/quiz/${session.id}/results`} className="block group">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-semibold truncate max-w-[150px] group-hover:text-primary transition-colors">{session.title}</p>
+                          <span className="text-xs font-bold text-primary">{session.results?.score}%</span>
+                        </div>
+                        <Progress value={session.results?.score} className="h-2" />
+                        <p className="text-[10px] text-muted-foreground">{new Date(session.timestamp).toLocaleDateString()}</p>
                       </div>
-                      <Progress value={session.results?.score} className="h-2" />
-                      <p className="text-[10px] text-muted-foreground">{new Date(session.timestamp).toLocaleDateString()}</p>
-                    </div>
+                    </Link>
                   ))
                 ) : (
                   <p className="text-sm text-center text-muted-foreground py-10">No recent quizzes found.</p>

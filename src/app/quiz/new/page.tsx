@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,10 +11,11 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BrainCircuit, Upload, FileText, Loader2, Sparkles, ArrowLeft, FileType } from "lucide-react";
 import { generateQuestions } from "@/ai/flows/ai-question-generator";
-import { store } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { extractTextFromPdf } from "@/lib/pdf-utils";
+import { useAuth, useUser } from "@/firebase";
+import { collection, doc, setDoc } from "firebase/firestore";
 
 export default function NewQuizPage() {
   const [content, setContent] = useState("");
@@ -25,6 +26,8 @@ export default function NewQuizPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { toast } = useToast();
+  const { user } = useUser();
+  const { firestore } = useAuth();
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -65,10 +68,10 @@ export default function NewQuizPage() {
   }
 
   async function handleGenerate() {
-    if (!content || !title) {
+    if (!content || !title || !user || !firestore) {
       toast({
-        title: "Missing fields",
-        description: "Please provide a title and some content to generate questions.",
+        title: "Missing requirements",
+        description: "Please provide content and ensure you're logged in.",
         variant: "destructive"
       });
       return;
@@ -78,16 +81,20 @@ export default function NewQuizPage() {
     try {
       const questions = await generateQuestions({ content });
       
+      const sessionId = Math.random().toString(36).substr(2, 9);
+      const sessionRef = doc(firestore, 'users', user.uid, 'sessions', sessionId);
+
       const newSession = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: sessionId,
         title,
         content,
         questions,
         timestamp: Date.now()
       };
 
-      store.addSession(newSession);
-      router.push(`/quiz/${newSession.id}`);
+      // Optimistic write
+      setDoc(sessionRef, newSession);
+      router.push(`/quiz/${sessionId}`);
     } catch (error) {
       console.error(error);
       toast({
@@ -226,10 +233,6 @@ export default function NewQuizPage() {
                   </>
                 )}
               </Button>
-              
-              <p className="text-center text-xs text-muted-foreground px-4">
-                AI technology provides advanced insights but may occasionally generate inaccuracies. Please verify key educational facts.
-              </p>
             </div>
           </CardContent>
         </Card>

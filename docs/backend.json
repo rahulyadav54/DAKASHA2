@@ -1,0 +1,47 @@
+
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Information about the user's account and educational role.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["Student", "Teacher", "Parent", "Admin"] },
+        "avatar": { "type": "string" }
+      },
+      "required": ["name", "email", "role"]
+    },
+    "QuizSession": {
+      "title": "Quiz Session",
+      "description": "A single reading comprehension quiz session and its results.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "questions": {
+          "type": "object"
+        },
+        "results": {
+          "type": "object"
+        }
+      },
+      "required": ["title", "content", "timestamp", "questions"]
+    }
+  },
+  "auth": {
+    "providers": ["google.com", "password"]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Stores user profile and settings."
+    },
+    "/users/{userId}/sessions/{sessionId}": {
+      "schema": "QuizSession",
+      "description": "Stores quiz sessions and results for a specific user."
+    }
+  }
+}
