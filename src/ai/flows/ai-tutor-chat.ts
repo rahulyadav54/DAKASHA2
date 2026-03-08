@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview AI Tutor chat flow.
@@ -43,6 +42,13 @@ The student is currently studying this material:
 {{{context}}}
 {{/if}}
 
+{{#if history}}
+Conversation History:
+{{#each history}}
+- {{role}}: {{{text}}}
+{{/each}}
+{{/if}}
+
 Guidelines:
 - If the student asks about the provided context, answer accurately based on that text.
 - If they ask general questions, provide helpful educational guidance.
@@ -62,9 +68,6 @@ const tutorChatFlow = ai.defineFlow(
     outputSchema: TutorChatOutputSchema,
   },
   async (input) => {
-    // We pass history to the prompt if we want the LLM to see it, 
-    // or we can use the Genkit chat interface. For simplicity in this flow 
-    // we'll just focus on the current message and context.
     const { output } = await tutorPrompt(input);
     if (!output) throw new Error("Tutor failed to respond.");
     return output;

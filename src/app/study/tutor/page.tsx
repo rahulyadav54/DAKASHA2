@@ -16,7 +16,8 @@ import {
   Plus,
   User,
   PanelLeft,
-  X
+  X,
+  AlertCircle
 } from "lucide-react";
 import Link from "next/link";
 import { useUser, useCollection, useAuth, useDoc } from "@/firebase";
@@ -31,6 +32,7 @@ import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function AiTutorPage() {
   const { user } = useUser();
@@ -44,27 +46,34 @@ export default function AiTutorPage() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | "none">("none");
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch User Sessions for context
   const sessionsRef = useMemo(() => {
     if (!user || !firestore) return null;
     return query(collection(firestore, 'users', user.uid, 'sessions'), orderBy('timestamp', 'desc'), limit(10));
   }, [user, firestore]);
-  const { data: sessions } = useCollection<any>(sessionsRef);
+  const { data: sessions, error: sessionsError } = useCollection<any>(sessionsRef);
 
   // Fetch User Chat Histories
   const chatsRef = useMemo(() => {
     if (!user || !firestore) return null;
     return query(collection(firestore, 'users', user.uid, 'tutorChats'), orderBy('lastMessageAt', 'desc'));
   }, [user, firestore]);
-  const { data: chats, loading: chatsLoading } = useCollection<any>(chatsRef);
+  const { data: chats, loading: chatsLoading, error: chatsError } = useCollection<any>(chatsRef);
 
   // Fetch Active Chat Details
   const activeChatPath = useMemo(() => {
     if (!user || !activeChatId) return null;
     return `users/${user.uid}/tutorChats/${activeChatId}`;
   }, [user, activeChatId]);
-  const { data: activeChat } = useDoc<any>(activeChatPath);
+  const { data: activeChat, error: activeChatError } = useDoc<any>(activeChatPath);
+
+  useEffect(() => {
+    if (sessionsError || chatsError || activeChatError) {
+      setError("We encountered a permission issue accessing your data. Please check your Firestore rules.");
+    }
+  }, [sessionsError, chatsError, activeChatError]);
 
   // Get Content of Selected Session
   const selectedSession = sessions?.find(s => s.id === selectedSessionId);
@@ -87,7 +96,7 @@ export default function AiTutorPage() {
       sessionId: selectedSessionId === "none" ? null : selectedSessionId,
       lastMessageAt: Date.now(),
       messages: [
-        { role: 'model', text: "Hello! I'm your SmartRead AI Tutor. I've analyzed your context and I'm ready to help you master this material. What's on your mind?", timestamp: Date.now() }
+        { role: 'model', text: "Hello! I'm your SmartRead AI Tutor. I'm ready to help you master your reading. What can I explain for you today?", timestamp: Date.now() }
       ]
     };
 
@@ -95,6 +104,7 @@ export default function AiTutorPage() {
       const docRef = await addDoc(collection(firestore, 'users', user.uid, 'tutorChats'), newChat);
       setActiveChatId(docRef.id);
       setIsSidebarOpen(false);
+      setError(null);
     } catch (err: any) {
       const permissionError = new FirestorePermissionError({
         path: `users/${user.uid}/tutorChats`,
@@ -139,7 +149,7 @@ export default function AiTutorPage() {
     } catch (err: any) {
       toast({ 
         title: "Tutor error", 
-        description: "Failed to process message. Please check your connection.",
+        description: "Failed to process message. Please check your Gemini API key.",
         variant: "destructive" 
       });
     } finally {
@@ -226,7 +236,7 @@ export default function AiTutorPage() {
               <div className="bg-primary p-2 rounded-xl shadow-sm">
                 <Bot className="h-5 w-5 text-white" />
               </div>
-              <div>
+              <div className="hidden sm:block">
                 <h1 className="text-sm md:text-lg font-headline font-bold text-slate-900 leading-tight">AI Study Tutor</h1>
                 <p className="text-[10px] md:text-xs text-muted-foreground font-medium">Powered by Gemini AI</p>
               </div>
@@ -235,7 +245,7 @@ export default function AiTutorPage() {
           
           <div className="flex items-center gap-2 md:gap-4">
             <Select value={selectedSessionId} onValueChange={setSelectedSessionId}>
-              <SelectTrigger className="w-[140px] md:w-[220px] h-9 rounded-full bg-slate-50 border-slate-200 text-xs font-medium">
+              <SelectTrigger className="w-[120px] md:w-[220px] h-9 rounded-full bg-slate-50 border-slate-200 text-xs font-medium">
                 <SelectValue placeholder="Context" />
               </SelectTrigger>
               <SelectContent className="rounded-xl">
@@ -272,6 +282,14 @@ export default function AiTutorPage() {
 
         {/* Chat Section */}
         <div className="flex-1 flex flex-col overflow-hidden relative">
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Permission Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
           {activeChatId ? (
             <div className="flex-1 flex flex-col bg-white rounded-3xl shadow-lg shadow-slate-200/50 border border-slate-200/60 overflow-hidden">
               <ScrollArea className="flex-1" ref={scrollRef}>
@@ -368,22 +386,6 @@ export default function AiTutorPage() {
                >
                  <MessageCircle className="h-6 w-6" /> Start New Conversation
                </Button>
-               
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16 w-full max-w-4xl">
-                 {[
-                   { icon: <BookOpen className="h-6 w-6 text-blue-500" />, title: "Contextual", desc: "Knows your specific reading sessions." },
-                   { icon: <Sparkles className="h-6 w-6 text-yellow-500" />, title: "Intelligent", desc: "Powered by advanced Gemini 2.5." },
-                   { icon: <Plus className="h-6 w-6 text-green-500" />, title: "Available 24/7", desc: "Get help exactly when you need it." }
-                 ].map((feat, i) => (
-                   <div key={i} className="group p-6 rounded-[2rem] bg-slate-50 border border-slate-100 transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1">
-                      <div className="bg-white p-3 rounded-2xl shadow-sm w-fit mx-auto mb-4 group-hover:bg-slate-50 transition-colors">
-                        {feat.icon}
-                      </div>
-                      <h4 className="font-bold text-slate-800 text-sm mb-1">{feat.title}</h4>
-                      <p className="text-[11px] text-slate-500 font-medium leading-relaxed">{feat.desc}</p>
-                   </div>
-                 ))}
-               </div>
             </div>
           )}
         </div>
