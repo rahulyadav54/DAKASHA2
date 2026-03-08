@@ -16,7 +16,8 @@ import {
   BookOpen,
   HelpCircle,
   Lightbulb,
-  Share2
+  Share2,
+  Info
 } from "lucide-react";
 import Link from "next/link";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
