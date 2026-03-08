@@ -1,7 +1,6 @@
-
 'use server';
 /**
- * @fileOverview Flow for generating a study guide from text.
+ * @fileOverview Flow for generating a study guide from text, now including important questions and answers.
  */
 
 import { ai } from '@/ai/genkit';
@@ -18,7 +17,11 @@ const StudyGuideOutputSchema = z.object({
   vocabulary: z.array(z.object({
     word: z.string(),
     definition: z.string()
-  })).describe('Key vocabulary terms.')
+  })).describe('Key vocabulary terms.'),
+  studyQuestions: z.array(z.object({
+    question: z.string(),
+    answer: z.string()
+  })).describe('Important questions and their corresponding answers to test understanding.')
 });
 
 export type StudyGuideOutput = z.infer<typeof StudyGuideOutputSchema>;
@@ -29,7 +32,11 @@ export async function generateStudyGuide(input: z.infer<typeof StudyGuideInputSc
     input: { schema: StudyGuideInputSchema },
     output: { schema: StudyGuideOutputSchema },
     prompt: `Create a comprehensive study guide for the following text. 
-    Include a summary, a list of bulleted key points, and a glossary of important vocabulary.
+    Include:
+    1. A high-level summary.
+    2. A list of bulleted key points (main takeaways).
+    3. A glossary of important vocabulary terms.
+    4. A list of at least 5 important "Important Questions" with their "Detailed Answers" that a student should know after reading this material.
 
     Text:
     {{{content}}}`,

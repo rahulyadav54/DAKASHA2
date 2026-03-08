@@ -1,8 +1,7 @@
-
 "use client";
 
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useRef } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
   ArrowLeft, 
@@ -12,19 +11,61 @@ import {
   FileText, 
   CheckCircle2, 
   ListOrdered,
-  BookMarked
+  BookMarked,
+  HelpCircle,
+  Upload,
+  FileType,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import Link from "next/link";
 import { Textarea } from "@/components/ui/textarea";
 import { generateStudyGuide, StudyGuideOutput } from "@/ai/flows/study-guide-generator";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { extractTextFromPdf } from "@/lib/pdf-utils";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 export default function StudyGuidePage() {
   const { toast } = useToast();
   const [content, setContent] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [parsing, setParsing] = useState(false);
+  const [fileName, setFileName] = useState("");
   const [guide, setGuide] = useState<StudyGuideOutput | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== "application/pdf") {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a PDF document.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setParsing(true);
+    setFileName(file.name);
+    try {
+      const text = await extractTextFromPdf(file);
+      setContent(text);
+      toast({ title: "PDF text extracted successfully!" });
+    } catch (error) {
+      toast({
+        title: "Extraction Error",
+        description: "Failed to read the PDF. Try pasting the text manually.",
+        variant: "destructive"
+      });
+    } finally {
+      setParsing(false);
+    }
+  };
 
   const handleGenerate = async () => {
     if (!content.trim()) return;
@@ -62,35 +103,101 @@ export default function StudyGuidePage() {
               <div className="bg-primary/5 p-4 rounded-full inline-block mb-4">
                 <FileText className="h-10 w-10 text-primary" />
               </div>
-              <CardTitle className="text-2xl font-headline">Transform Text into a Study Guide</CardTitle>
-              <p className="text-muted-foreground">Paste any text or notes, and we'll create a structured guide with key takeaways and vocabulary.</p>
+              <CardTitle className="text-2xl font-headline">Generate Your Custom Study Guide</CardTitle>
+              <CardDescription className="max-w-lg mx-auto">
+                Paste any text or upload a PDF to extract summaries, key points, vocabulary, and important questions with answers.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <Textarea 
-                placeholder="Paste your material here..." 
-                className="min-h-[300px] text-base"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-              />
-              <Button className="w-full h-14 text-lg rounded-xl shadow-md" disabled={generating || !content} onClick={handleGenerate}>
-                {generating ? <Loader2 className="animate-spin h-5 w-5 mr-2" /> : <Sparkles className="h-5 w-5 mr-2" />}
-                Generate Study Guide
+            <CardContent className="space-y-8">
+              <Tabs defaultValue="text" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-6">
+                  <TabsTrigger value="text"><FileText className="h-4 w-4 mr-2" /> Paste Text</TabsTrigger>
+                  <TabsTrigger value="file"><Upload className="h-4 w-4 mr-2" /> Upload PDF</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="text" className="mt-0">
+                  <Textarea 
+                    placeholder="Paste your reading material or notes here..." 
+                    className="min-h-[300px] text-base p-4"
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                  />
+                </TabsContent>
+
+                <TabsContent value="file" className="mt-0">
+                  <div 
+                    className="border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center space-y-4 cursor-pointer hover:bg-accent/5 transition-colors"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      className="hidden" 
+                      accept=".pdf"
+                      onChange={handleFileChange} 
+                    />
+                    {parsing ? (
+                      <div className="flex flex-col items-center space-y-2">
+                        <Loader2 className="h-10 w-10 text-primary animate-spin" />
+                        <p className="text-sm font-medium">Extracting text...</p>
+                      </div>
+                    ) : fileName ? (
+                      <div className="flex flex-col items-center space-y-2">
+                        <FileType className="h-12 w-12 text-primary" />
+                        <p className="font-semibold text-primary">{fileName}</p>
+                        <p className="text-xs text-muted-foreground">Click to replace file</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="bg-primary/10 p-4 rounded-full">
+                          <Upload className="h-8 w-8 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-lg font-semibold">Drop your PDF here</p>
+                          <p className="text-sm text-muted-foreground">We'll automatically read the text for you.</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
+
+              <Button 
+                className="w-full h-14 text-lg rounded-xl shadow-md transition-all active:scale-[0.98]" 
+                disabled={generating || parsing || !content.trim()} 
+                onClick={handleGenerate}
+              >
+                {generating ? (
+                  <>
+                    <Loader2 className="animate-spin h-5 w-5 mr-2" />
+                    Analyzing Content...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-5 w-5 mr-2" />
+                    Generate AI Study Guide
+                  </>
+                )}
               </Button>
             </CardContent>
           </Card>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="lg:col-span-2 space-y-8">
-              <Card className="shadow-md border-none">
-                <CardHeader className="bg-primary/5 rounded-t-lg">
+              {/* Summary & Key Points */}
+              <Card className="shadow-md border-none overflow-hidden">
+                <CardHeader className="bg-primary text-primary-foreground">
                   <CardTitle className="font-headline text-xl">{guide.title}</CardTitle>
+                  <CardDescription className="text-primary-foreground/80">Automated Study Companion</CardDescription>
                 </CardHeader>
-                <CardContent className="pt-6 space-y-6">
-                  <div className="space-y-3">
+                <CardContent className="pt-8 space-y-8">
+                  <div className="space-y-4">
                     <h3 className="text-sm font-bold text-primary uppercase tracking-widest flex items-center gap-2">
                       <FileText className="h-4 w-4" /> Summary
                     </h3>
-                    <p className="text-muted-foreground leading-relaxed">{guide.summary}</p>
+                    <p className="text-muted-foreground leading-relaxed text-base md:text-lg">
+                      {guide.summary}
+                    </p>
                   </div>
                   
                   <Separator />
@@ -99,44 +206,70 @@ export default function StudyGuidePage() {
                     <h3 className="text-sm font-bold text-primary uppercase tracking-widest flex items-center gap-2">
                       <ListOrdered className="h-4 w-4" /> Key Takeaways
                     </h3>
-                    <ul className="space-y-3">
+                    <div className="grid gap-3">
                       {guide.keyPoints.map((point, i) => (
-                        <li key={i} className="flex gap-3 text-sm md:text-base">
-                          <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
-                          <span>{point}</span>
-                        </li>
+                        <div key={i} className="flex gap-4 p-4 rounded-xl bg-accent/5 border border-accent/10">
+                          <CheckCircle2 className="h-6 w-6 text-green-500 shrink-0" />
+                          <span className="text-sm md:text-base leading-relaxed">{point}</span>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Study Questions */}
+              <div className="space-y-4">
+                <h2 className="text-2xl font-headline flex items-center gap-3">
+                  <HelpCircle className="h-7 w-7 text-primary" />
+                  Important Questions & Answers
+                </h2>
+                <Accordion type="single" collapsible className="w-full space-y-3">
+                  {guide.studyQuestions.map((sq, i) => (
+                    <AccordionItem key={i} value={`q-${i}`} className="border rounded-xl bg-white px-4 overflow-hidden shadow-sm">
+                      <AccordionTrigger className="hover:no-underline py-4 text-left font-semibold">
+                        {sq.question}
+                      </AccordionTrigger>
+                      <AccordionContent className="pb-6">
+                        <div className="p-5 rounded-lg bg-green-50 border border-green-100 text-sm md:text-base leading-relaxed">
+                          <span className="block text-[10px] font-bold text-green-600 uppercase mb-2">Answer</span>
+                          {sq.answer}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              </div>
             </div>
 
             <div className="space-y-6">
-              <Card className="shadow-md">
-                <CardHeader>
+              {/* Vocabulary Sidebar */}
+              <Card className="shadow-md border-primary/10">
+                <CardHeader className="bg-accent/5">
                   <CardTitle className="text-lg font-headline flex items-center gap-2">
                     <BookMarked className="h-5 w-5 text-accent" />
-                    Vocabulary
+                    Key Vocabulary
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="pt-6 space-y-6">
                   {guide.vocabulary.map((v, i) => (
-                    <div key={i} className="space-y-1">
+                    <div key={i} className="space-y-2">
                       <span className="font-bold text-sm block text-accent">{v.word}</span>
-                      <p className="text-xs text-muted-foreground">{v.definition}</p>
-                      {i < guide.vocabulary.length - 1 && <Separator className="mt-2" />}
+                      <p className="text-xs text-muted-foreground leading-relaxed">{v.definition}</p>
+                      {i < guide.vocabulary.length - 1 && <Separator className="mt-4" />}
                     </div>
                   ))}
                 </CardContent>
               </Card>
 
-              <Card className="bg-accent text-accent-foreground shadow-lg">
-                <CardContent className="pt-6">
-                  <h3 className="font-headline mb-2">Ready to test?</h3>
-                  <p className="text-sm opacity-80 mb-4">Turn this guide into a quiz to reinforce your memory.</p>
-                  <Button variant="secondary" className="w-full" asChild>
-                    <Link href="/quiz/new">Start Quiz</Link>
+              {/* Action Card */}
+              <Card className="bg-primary text-primary-foreground shadow-lg overflow-hidden relative">
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+                <CardContent className="pt-8">
+                  <h3 className="font-headline text-lg mb-2">Mastered the material?</h3>
+                  <p className="text-sm opacity-90 mb-6">Test your knowledge with a generated quiz based on this study guide.</p>
+                  <Button variant="secondary" className="w-full h-12 font-bold" asChild>
+                    <Link href="/quiz/new">Take Final Quiz</Link>
                   </Button>
                 </CardContent>
               </Card>
