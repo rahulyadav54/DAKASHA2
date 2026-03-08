@@ -6,17 +6,16 @@ import { getFirestore } from 'firebase/firestore';
 
 /**
  * Firebase configuration for the ramiyaa-ff272 project.
- * 
- * IMPORTANT: You must replace the placeholders below with actual values
- * from your Firebase Console: Project Settings > General > Your apps.
+ * Using production values provided by the user.
  */
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "REPLACE_WITH_YOUR_API_KEY",
+  apiKey: "AIzaSyA9uBFfFyapsuEJvYSOkG28iAO4quQSS4M",
   authDomain: "ramiyaa-ff272.firebaseapp.com",
   projectId: "ramiyaa-ff272",
-  storageBucket: "ramiyaa-ff272.appspot.com",
-  messagingSenderId: "104910758060289544716",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:104910758060289544716:web:example"
+  storageBucket: "ramiyaa-ff272.firebasestorage.app",
+  messagingSenderId: "569550053176",
+  appId: "1:569550053176:web:dd5704f8641357d7002bcd",
+  measurementId: "G-QQHVPCNY47"
 };
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
