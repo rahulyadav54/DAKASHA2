@@ -21,8 +21,7 @@ import {
   Bot,
   BookOpenText,
   Users,
-  Trophy,
-  AlertCircle
+  Trophy
 } from "lucide-react";
 import Link from "next/link";
 import { Progress } from "@/components/ui/progress";
@@ -44,7 +43,7 @@ export default function DashboardPage() {
   const isMobile = useIsMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Protected route logic - check for real user OR guest user
+  // Protected route logic - handle real users AND guest users
   useEffect(() => {
     if (!userLoading && !user) {
       router.push('/login');
@@ -96,15 +95,13 @@ export default function DashboardPage() {
   }, [completedSessions, user]);
 
   const handleLogout = async () => {
-    if (user?.isGuest) {
+    if (typeof window !== 'undefined') {
       localStorage.removeItem('demo_user');
-      router.push('/');
-      return;
     }
-    if (auth) {
+    if (auth && !user?.isGuest) {
       await signOut(auth);
-      router.push('/');
     }
+    router.push('/');
   };
 
   const NavItem = ({ href, icon: Icon, label }: { href: string, icon: any, label: string }) => {
@@ -217,7 +214,7 @@ export default function DashboardPage() {
                <Bot className="h-4 w-4" />
                <AlertTitle className="font-bold">Demo Mode Active</AlertTitle>
                <AlertDescription>
-                 Firebase API is currently unavailable. Progress will not be saved to the cloud, but you can still test all AI features.
+                 Firebase API is currently blocked for this project. You are using a local guest session. AI features are still active!
                </AlertDescription>
              </Alert>
           )}

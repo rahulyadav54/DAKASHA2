@@ -14,37 +14,38 @@ export function useUser() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for demo user in local storage first to support bypass mode
-    const checkUser = () => {
-      const demoUserJson = typeof window !== 'undefined' ? localStorage.getItem('demo_user') : null;
+    // 1. Initial check for demo user in local storage
+    const getDemoUser = () => {
+      if (typeof window === 'undefined') return null;
+      const demoUserJson = localStorage.getItem('demo_user');
       if (demoUserJson) {
         try {
-          const demoUser = JSON.parse(demoUserJson);
-          setUser({ ...demoUser, isGuest: true });
-          setLoading(false);
-          return true;
+          return { ...JSON.parse(demoUserJson), isGuest: true };
         } catch (e) {
           console.error("Failed to parse demo user", e);
         }
       }
-      return false;
+      return null;
     };
 
-    if (checkUser()) return;
-
+    const demoUser = getDemoUser();
+    
+    // If no Firebase auth instance (e.g. config error), fallback to demo user immediately
     if (!auth) {
+      setUser(demoUser);
       setLoading(false);
       return;
     }
     
+    // 2. Listen to Firebase Auth state
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
+        // Real user found, clear demo if it exists
         setUser(firebaseUser);
       } else {
-        // Double check demo user one last time in case it was just set
-        if (!checkUser()) {
-          setUser(null);
-        }
+        // No real user, check if we have a demo user
+        const currentDemo = getDemoUser();
+        setUser(currentDemo);
       }
       setLoading(false);
     });

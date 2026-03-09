@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BrainCircuit, Loader2, ArrowLeft, AlertCircle, ExternalLink, ShieldAlert, Info, Key, Sparkles } from "lucide-react";
+import { BrainCircuit, Loader2, ArrowLeft, AlertCircle, ExternalLink, ShieldAlert, Key, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useAuth, useUser } from "@/firebase";
@@ -32,30 +32,40 @@ export default function LoginPage() {
   }, [user, userLoading, router]);
 
   const handleDemoMode = () => {
+    setLoading(true);
     const mockUser = {
       uid: 'demo-user-' + Math.random().toString(36).substr(2, 5),
       displayName: 'Demo Learner',
       email: 'demo@smartread.ai',
       photoURL: 'https://picsum.photos/seed/demo/100/100'
     };
-    localStorage.setItem('demo_user', JSON.stringify(mockUser));
-    toast({
-      title: "Demo Mode Active",
-      description: "You are now exploring SmartRead AI in guest mode.",
-    });
-    router.push('/dashboard');
+    
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('demo_user', JSON.stringify(mockUser));
+      toast({
+        title: "Demo Mode Active",
+        description: "Bypassing Firebase Auth. Redirecting to dashboard...",
+      });
+      // Small delay to ensure localStorage is set before redirect
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 500);
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth) return;
+    if (!auth) {
+      toast({ title: "Auth Error", description: "Firebase is not initialized.", variant: "destructive" });
+      return;
+    }
     setLoading(true);
     setApiError(false);
     setBlockedError(false);
     
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      localStorage.removeItem('demo_user'); // Clear demo if real login works
+      localStorage.removeItem('demo_user');
       router.push('/dashboard');
     } catch (error: any) {
       console.error("Login Error:", error);
@@ -78,7 +88,10 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = async () => {
-    if (!auth || !firestore) return;
+    if (!auth || !firestore) {
+      toast({ title: "Auth Error", description: "Firebase is not initialized.", variant: "destructive" });
+      return;
+    }
     setLoading(true);
     setApiError(false);
     setBlockedError(false);
@@ -215,17 +228,22 @@ export default function LoginPage() {
                        Check Key Restrictions <ExternalLink className="ml-2 h-3 w-3" />
                      </a>
                    </Button>
-                   <p className="text-[10px] italic opacity-80">Find the key ending in <strong>HrFU</strong> and set "API restrictions" to "None".</p>
                 </div>
               </AlertDescription>
             </Alert>
           )}
           
           <div className="pt-2">
-            <Button variant="secondary" className="w-full h-14 rounded-2xl border-2 border-primary/10 hover:bg-primary/5 text-primary font-bold shadow-sm gap-2" onClick={handleDemoMode}>
-              <Sparkles className="h-4 w-4" /> Demo Mode (Bypass Login)
+            <Button 
+              variant="secondary" 
+              className="w-full h-14 rounded-2xl border-2 border-primary/10 hover:bg-primary/5 text-primary font-bold shadow-sm gap-2" 
+              onClick={handleDemoMode}
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              Bypass Login (Demo Mode)
             </Button>
-            <p className="text-[10px] text-center text-muted-foreground mt-2 italic">Use Demo Mode if your Firebase API is currently blocked.</p>
+            <p className="text-[10px] text-center text-muted-foreground mt-2 italic">Use this if you cannot enable the Firebase APIs right now.</p>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4 border-t pt-6 bg-slate-50/50 text-center">
