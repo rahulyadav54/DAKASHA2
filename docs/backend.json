@@ -21,6 +21,8 @@
         "title": { "type": "string" },
         "content": { "type": "string" },
         "timestamp": { "type": "number" },
+        "timer": { "type": "number", "description": "Time limit in minutes" },
+        "totalMarks": { "type": "number", "description": "Total marks for the quiz" },
         "questions": {
           "type": "object"
         },

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef } from "react";
@@ -8,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BrainCircuit, Upload, FileText, Loader2, Sparkles, ArrowLeft, FileType, AlertCircle } from "lucide-react";
+import { BrainCircuit, Upload, FileText, Loader2, Sparkles, ArrowLeft, FileType, AlertCircle, Timer, Award } from "lucide-react";
 import { generateQuestions } from "@/ai/flows/ai-question-generator";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -18,10 +19,13 @@ import { doc, setDoc } from "firebase/firestore";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function NewQuizPage() {
   const [content, setContent] = useState("");
   const [title, setTitle] = useState("");
+  const [timer, setTimer] = useState("10"); // Default 10 minutes
+  const [totalMarks, setTotalMarks] = useState("100"); // Default 100 marks
   const [loading, setLoading] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [fileName, setFileName] = useState("");
@@ -84,7 +88,6 @@ export default function NewQuizPage() {
     setLoading(true);
     setErrorDetails(null);
     try {
-      // 1. Generate questions using AI
       const questions = await generateQuestions({ content });
       
       if (!questions || (!questions.multipleChoiceQuestions.length && !questions.shortAnswerQuestions.length)) {
@@ -99,13 +102,13 @@ export default function NewQuizPage() {
         title,
         content,
         questions,
+        timer: parseInt(timer) || 0,
+        totalMarks: parseInt(totalMarks) || 100,
         timestamp: Date.now()
       };
 
-      // 2. Save to Firestore and WAIT for success
       try {
         await setDoc(sessionRef, newSession);
-        // 3. Only redirect after successful save
         router.push(`/quiz/${sessionId}`);
       } catch (err: any) {
         console.error("Firestore Save Error:", err);
@@ -115,7 +118,7 @@ export default function NewQuizPage() {
           requestResourceData: newSession,
         });
         errorEmitter.emit('permission-error', permissionError);
-        throw new Error("Failed to save the quiz to your account. Check your database permissions.");
+        throw new Error("Failed to save the quiz to your account.");
       }
 
     } catch (error: any) {
@@ -149,7 +152,7 @@ export default function NewQuizPage() {
             </div>
             <CardTitle className="text-3xl font-headline">Create New Reading Quiz</CardTitle>
             <CardDescription className="text-base max-w-lg mx-auto">
-              Our AI will analyze your content to create a personalized comprehension assessment.
+              Configure your assessment settings and provide the reading material.
             </CardDescription>
           </CardHeader>
           
@@ -159,21 +162,55 @@ export default function NewQuizPage() {
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Error</AlertTitle>
-                  <AlertDescription>
-                    {errorDetails}
-                  </AlertDescription>
+                  <AlertDescription>{errorDetails}</AlertDescription>
                 </Alert>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="title" className="text-sm font-semibold">Quiz Title</Label>
-                <Input 
-                  id="title" 
-                  placeholder="e.g., Photosynthesis Chapter 1" 
-                  value={title} 
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="h-12"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="title" className="text-sm font-semibold">Quiz Title</Label>
+                  <Input 
+                    id="title" 
+                    placeholder="e.g., Photosynthesis Chapter 1" 
+                    value={title} 
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="h-12"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold flex items-center gap-2">
+                      <Timer className="h-4 w-4 text-primary" /> Timer (min)
+                    </Label>
+                    <Select value={timer} onValueChange={setTimer}>
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">No Limit</SelectItem>
+                        <SelectItem value="5">5 min</SelectItem>
+                        <SelectItem value="10">10 min</SelectItem>
+                        <SelectItem value="15">15 min</SelectItem>
+                        <SelectItem value="20">20 min</SelectItem>
+                        <SelectItem value="30">30 min</SelectItem>
+                        <SelectItem value="45">45 min</SelectItem>
+                        <SelectItem value="60">60 min</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold flex items-center gap-2">
+                      <Award className="h-4 w-4 text-primary" /> Total Marks
+                    </Label>
+                    <Input 
+                      type="number"
+                      value={totalMarks}
+                      onChange={(e) => setTotalMarks(e.target.value)}
+                      className="h-12"
+                      min="1"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-4">
@@ -226,13 +263,6 @@ export default function NewQuizPage() {
                           <FileType className="h-12 w-12 text-primary" />
                           <p className="font-semibold text-primary">{fileName}</p>
                           <p className="text-xs text-muted-foreground">Click to replace file</p>
-                          <div className="pt-4 w-full">
-                            <Textarea 
-                              value={content.slice(0, 500) + (content.length > 500 ? "..." : "")}
-                              readOnly
-                              className="bg-muted text-xs h-24"
-                            />
-                          </div>
                         </div>
                       ) : (
                         <>
@@ -259,7 +289,7 @@ export default function NewQuizPage() {
                 {loading ? (
                   <>
                     <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                    Analyzing Content & Generating Questions...
+                    Generating Custom Quiz...
                   </>
                 ) : (
                   <>

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { QuizResult, AnswerEvaluation } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,8 @@ import {
   Info,
   FileText,
   HelpCircle,
-  AlertCircle
+  AlertCircle,
+  Timer
 } from "lucide-react";
 import { semanticAnswerEvaluator } from "@/ai/flows/semantic-answer-evaluator-flow";
 import { useToast } from "@/hooks/use-toast";
@@ -49,6 +50,7 @@ export default function QuizSessionPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("question");
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
   const allQuestions = useMemo(() => {
     if (!session?.questions) return [];
@@ -60,42 +62,12 @@ export default function QuizSessionPage() {
     ];
   }, [session]);
 
-  if (sessionLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="animate-spin h-10 w-10 text-primary" />
-          <p className="text-sm text-muted-foreground font-medium">Loading your session...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!session && !sessionLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4">
-        <Alert variant="destructive" className="max-w-md mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Quiz Not Found</AlertTitle>
-          <AlertDescription>
-            The quiz session you're looking for doesn't exist or hasn't loaded yet.
-          </AlertDescription>
-        </Alert>
-        <Button onClick={() => router.push('/dashboard')}>Back to Dashboard</Button>
-      </div>
-    );
-  }
-
-  const totalSteps = allQuestions.length;
-  const currentQuestion = allQuestions[currentIdx];
-  const progress = totalSteps > 0 ? ((currentIdx + 1) / totalSteps) * 100 : 0;
-
-  async function handleSubmit() {
-    if (!firestore || !user || !session) return;
+  const handleSubmit = useCallback(async () => {
+    if (!firestore || !user || !session || submitting) return;
     setSubmitting(true);
     try {
       const evaluations: AnswerEvaluation[] = [];
-      let totalScore = 0;
+      let totalWeightedScore = 0;
 
       for (let i = 0; i < allQuestions.length; i++) {
         const q = allQuestions[i];
@@ -114,7 +86,7 @@ export default function QuizSessionPage() {
           const isCorrect = studentAnswer.toLowerCase() === isTrueValue;
           evalResult = {
             correctnessScore: isCorrect ? 100 : 0,
-            explanationFeedback: isCorrect ? "Perfect!" : "Incorrect.",
+            explanationFeedback: isCorrect ? "Correct!" : "Incorrect.",
             suggestionsForImprovement: ""
           };
         } else {
@@ -122,7 +94,7 @@ export default function QuizSessionPage() {
           const isCorrect = studentAnswer.toLowerCase().trim() === correctAnswerText;
           evalResult = {
             correctnessScore: isCorrect ? 100 : 0,
-            explanationFeedback: isCorrect ? "Perfect!" : "Incorrect.",
+            explanationFeedback: isCorrect ? "Correct!" : "Incorrect.",
             suggestionsForImprovement: ""
           };
         }
@@ -138,41 +110,89 @@ export default function QuizSessionPage() {
           suggestions: evalResult?.suggestionsForImprovement || ""
         });
 
-        totalScore += evalResult?.correctnessScore || 0;
+        totalWeightedScore += evalResult?.correctnessScore || 0;
       }
 
+      // Calculate final score based on totalMarks if defined, otherwise as percentage
+      const avgPercentage = allQuestions.length > 0 ? totalWeightedScore / allQuestions.length : 0;
+      const finalScore = session.totalMarks 
+        ? Math.round((avgPercentage / 100) * session.totalMarks)
+        : Math.round(avgPercentage);
+
       const results: QuizResult = {
-        score: allQuestions.length > 0 ? Math.round(totalScore / allQuestions.length) : 0,
+        score: finalScore,
         totalQuestions: allQuestions.length,
         evaluations,
         feedback: "Assessment complete."
       };
 
       const docRef = doc(firestore, 'users', user.uid, 'sessions', id as string);
-      
-      try {
-        await updateDoc(docRef, { results });
-        router.push(`/quiz/${id}/results`);
-      } catch (err: any) {
-        const permissionError = new FirestorePermissionError({
-          path: docRef.path,
-          operation: 'update',
-          requestResourceData: { results },
-        });
-        errorEmitter.emit('permission-error', permissionError);
-        throw new Error("Failed to save results.");
-      }
+      await updateDoc(docRef, { results });
+      router.push(`/quiz/${id}/results`);
 
     } catch (error) {
       toast({
         title: "Grading failed",
-        description: "There was a problem grading your quiz. Please try again.",
+        description: "There was a problem grading your quiz.",
         variant: "destructive"
       });
     } finally {
       setSubmitting(false);
     }
+  }, [firestore, user, session, allQuestions, answers, submitting, id, router, toast]);
+
+  // Timer logic
+  useEffect(() => {
+    if (session?.timer && timeLeft === null) {
+      setTimeLeft(session.timer * 60);
+    }
+  }, [session, timeLeft]);
+
+  useEffect(() => {
+    if (timeLeft === null) return;
+    if (timeLeft <= 0) {
+      toast({ title: "Time's up!", description: "Submitting your quiz automatically." });
+      handleSubmit();
+      return;
+    }
+
+    const timerId = setInterval(() => {
+      setTimeLeft((prev) => (prev !== null ? prev - 1 : null));
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, [timeLeft, handleSubmit, toast]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  if (sessionLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="animate-spin h-10 w-10 text-primary" />
+      </div>
+    );
   }
+
+  if (!session) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+        <Alert variant="destructive" className="max-w-md">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Quiz Not Found</AlertTitle>
+          <AlertDescription>The quiz session could not be found.</AlertDescription>
+        </Alert>
+        <Button className="mt-4" onClick={() => router.push('/dashboard')}>Back to Dashboard</Button>
+      </div>
+    );
+  }
+
+  const totalSteps = allQuestions.length;
+  const currentQuestion = allQuestions[currentIdx];
+  const progress = totalSteps > 0 ? ((currentIdx + 1) / totalSteps) * 100 : 0;
 
   const handleNext = () => {
     if (currentIdx < totalSteps - 1) {
@@ -187,14 +207,18 @@ export default function QuizSessionPage() {
     setAnswers({ ...answers, [currentIdx]: val });
   };
 
-  if (totalSteps === 0) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4">
-        <h1 className="text-xl font-bold mb-4">No questions found in this session.</h1>
-        <Button onClick={() => router.push('/dashboard')}>Back to Dashboard</Button>
-      </div>
-    );
-  }
+  const PassageContent = (
+    <Card className={`${isMobile ? 'min-h-[400px]' : 'h-[calc(100vh-160px)]'} overflow-hidden flex flex-col shadow-sm border-none md:border`}>
+      <CardHeader className="border-b bg-accent/5 shrink-0">
+        <CardTitle className="text-sm font-headline flex items-center gap-2">
+          <Info className="h-4 w-4" /> Reference Passage
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex-1 overflow-auto p-4 md:p-6 font-body whitespace-pre-wrap text-sm md:text-base leading-relaxed">
+         {session.content || "No content available."}
+      </CardContent>
+    </Card>
+  );
 
   const QuizContent = (
     <Card className="flex-1 shadow-md border-primary/20 flex flex-col min-h-[400px]">
@@ -247,19 +271,6 @@ export default function QuizSessionPage() {
     </Card>
   );
 
-  const PassageContent = (
-    <Card className={`${isMobile ? 'min-h-[400px]' : 'h-[calc(100vh-160px)]'} overflow-hidden flex flex-col shadow-sm border-none md:border`}>
-      <CardHeader className="border-b bg-accent/5 shrink-0">
-        <CardTitle className="text-sm font-headline flex items-center gap-2">
-          <Info className="h-4 w-4" /> Reference Passage
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex-1 overflow-auto p-4 md:p-6 font-body whitespace-pre-wrap text-sm md:text-base leading-relaxed">
-         {session.content || "No content available."}
-      </CardContent>
-    </Card>
-  );
-
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b bg-white p-3 md:p-4 sticky top-0 z-50">
@@ -268,11 +279,21 @@ export default function QuizSessionPage() {
             <BookOpen className="h-5 w-5 text-primary shrink-0" />
             <h2 className="text-sm font-bold truncate max-w-[120px] md:max-w-[200px]">{session.title}</h2>
           </div>
+          
           <div className="flex items-center gap-2 md:gap-4 flex-1 max-w-md">
             <Progress value={progress} className="h-1.5 md:h-2 flex-1" />
             <span className="text-[10px] md:text-xs font-bold text-muted-foreground whitespace-nowrap">{currentIdx + 1}/{totalSteps}</span>
           </div>
-          <Button variant="outline" size="sm" onClick={() => router.push('/dashboard')} className="shrink-0 h-8 text-[10px] md:text-xs">Exit</Button>
+
+          <div className="flex items-center gap-2 md:gap-4 shrink-0">
+            {timeLeft !== null && (
+              <div className={`flex items-center gap-2 px-3 py-1 rounded-full font-mono font-bold text-xs md:text-sm ${timeLeft < 60 ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-slate-100 text-slate-700'}`}>
+                <Timer className="h-4 w-4" />
+                {formatTime(timeLeft)}
+              </div>
+            )}
+            <Button variant="outline" size="sm" onClick={() => router.push('/dashboard')} className="h-8 text-[10px] md:text-xs">Exit</Button>
+          </div>
         </div>
       </header>
 
@@ -287,12 +308,8 @@ export default function QuizSessionPage() {
                 <HelpCircle className="h-4 w-4 mr-2" /> Question
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="passage" className="mt-0">
-              {PassageContent}
-            </TabsContent>
-            <TabsContent value="question" className="mt-0">
-              {QuizContent}
-            </TabsContent>
+            <TabsContent value="passage" className="mt-0">{PassageContent}</TabsContent>
+            <TabsContent value="question" className="mt-0">{QuizContent}</TabsContent>
           </Tabs>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full items-start">
