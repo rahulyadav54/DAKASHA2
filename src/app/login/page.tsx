@@ -5,13 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BrainCircuit, Loader2, ArrowLeft } from "lucide-react";
+import { BrainCircuit, Loader2, ArrowLeft, AlertCircle, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useAuth, useUser } from "@/firebase";
 import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,6 +22,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("password123");
+  const [apiError, setApiError] = useState(false);
 
   useEffect(() => {
     if (user && !userLoading) {
@@ -32,11 +34,16 @@ export default function LoginPage() {
     e.preventDefault();
     if (!auth) return;
     setLoading(true);
+    setApiError(false);
     
     try {
       await signInWithEmailAndPassword(auth, email, password);
       router.push('/dashboard');
     } catch (error: any) {
+      console.error(error);
+      if (error.message.includes("identity-toolkit-api")) {
+        setApiError(true);
+      }
       toast({
         title: "Login failed",
         description: error.message || "Check your credentials.",
@@ -50,11 +57,15 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     if (!auth) return;
     setLoading(true);
+    setApiError(false);
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
       router.push('/dashboard');
     } catch (error: any) {
+      if (error.message.includes("identity-toolkit-api")) {
+        setApiError(true);
+      }
       toast({
         title: "Google login failed",
         description: error.message,
@@ -78,6 +89,21 @@ export default function LoginPage() {
           <CardDescription>Enter your details to access your tutor dashboard</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {apiError && (
+            <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle className="font-bold">API Required</AlertTitle>
+              <AlertDescription className="text-xs space-y-2">
+                <p>You must enable the <strong>Identity Toolkit API</strong> in your Google Cloud Console for login to work.</p>
+                <Button variant="link" size="sm" className="h-auto p-0 text-destructive font-bold underline flex items-center gap-1" asChild>
+                  <a href="https://console.developers.google.com/apis/api/identitytoolkit.googleapis.com/overview?project=ramiyaa-ff272" target="_blank" rel="noopener noreferrer">
+                    Click here to Enable API <ExternalLink className="h-3 w-3" />
+                  </a>
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -118,6 +144,12 @@ export default function LoginPage() {
           
           <Button variant="outline" className="w-full h-12 rounded-xl" onClick={handleGoogleLogin} disabled={loading}>
             Continue with Google
+          </Button>
+
+          <Button variant="ghost" className="w-full h-12 rounded-xl border-dashed border-2 hover:bg-slate-50" asChild>
+            <Link href="/dashboard">
+              Skip to Dashboard (Guest)
+            </Link>
           </Button>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4 border-t pt-6 bg-slate-50/50 rounded-b-lg text-center">

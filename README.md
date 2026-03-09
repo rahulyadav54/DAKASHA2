@@ -45,11 +45,13 @@ git push -u origin main
 
 ## ⚠️ Troubleshooting
 
+### "Identity Toolkit API has not been used"
+If you see this error during login, you MUST enable the API in your Google Cloud Console:
+- [Click here to Enable Identity Toolkit API](https://console.developers.google.com/apis/api/identitytoolkit.googleapis.com/overview?project=ramiyaa-ff272)
+- Alternatively, go to the [Firebase Console Authentication Tab](https://console.firebase.google.com/project/ramiyaa-ff272/authentication/providers) and ensure **Email/Password** and **Google** sign-in are enabled.
+
 ### "Missing or insufficient permissions"
 - This usually means the Firestore rules are not deployed. Ensure your `firestore.rules` in the Firebase Console matches the one in this project.
-
-### "Identity Toolkit API has not been used"
-- If you see this in the browser console during login, you must enable the **Identity Toolkit API** in your [Google Cloud Console](https://console.developers.google.com/apis/api/identitytoolkit.googleapis.com/overview?project=ramiyaa-ff272).
 
 ### AI Not Responding
 - Ensure the `GOOGLE_GENAI_API_KEY` is added to your Vercel environment variables. Without this, the server-side Genkit flows will fail.
