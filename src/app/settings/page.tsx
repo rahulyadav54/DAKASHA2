@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -56,10 +55,6 @@ export default function SettingsPage() {
       setRole(profile.role || "Student");
     }
   }, [profile]);
-
-  useEffect(() => {
-    if (!userLoading && !user) router.push('/login');
-  }, [user, userLoading, router]);
 
   const handleSave = async () => {
     if (!user || !firestore) return;
@@ -141,10 +136,17 @@ export default function SettingsPage() {
       </nav>
 
       <div className="pt-6 border-t mt-6 pb-6 px-1">
-        <Button variant="ghost" className="w-full justify-start gap-3 px-3 text-muted-foreground hover:text-destructive" onClick={handleLogout}>
-          <LogOut className="h-4 w-4" />
-          Sign Out
-        </Button>
+        {user?.isGuest ? (
+           <Button variant="ghost" className="w-full justify-start gap-3 px-3 text-muted-foreground hover:text-primary" asChild>
+             <Link href="/login">
+               <LogOut className="h-4 w-4" /> Sign In
+             </Link>
+           </Button>
+        ) : (
+          <Button variant="ghost" className="w-full justify-start gap-3 px-3 text-muted-foreground hover:text-destructive" onClick={handleLogout}>
+            <LogOut className="h-4 w-4" /> Sign Out
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -223,7 +225,7 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Email Address</Label>
                 <Input 
-                  value={user.email || ""} 
+                  value={user?.email || "guest@smartread.ai"} 
                   readOnly 
                   disabled
                   className="h-12 bg-muted/30"

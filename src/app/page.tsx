@@ -18,10 +18,9 @@ export default function LandingPage() {
           <nav className="hidden md:flex items-center gap-8">
             <Link href="#features" className="text-sm font-medium hover:text-primary transition-colors">Features</Link>
             <Link href="#how-it-works" className="text-sm font-medium hover:text-primary transition-colors">How it Works</Link>
-            <Link href="/login" className="text-sm font-medium hover:text-primary transition-colors">Login</Link>
           </nav>
           <Button asChild>
-            <Link href="/dashboard">Get Started</Link>
+            <Link href="/dashboard">Enter App</Link>
           </Button>
         </div>
       </header>
@@ -43,10 +42,10 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button size="lg" className="h-12 px-8 text-base rounded-full" asChild>
-                <Link href="/quiz/new">Start Your First Quiz</Link>
+                <Link href="/dashboard">Get Started for Free</Link>
               </Button>
               <Button size="lg" variant="outline" className="h-12 px-8 text-base rounded-full" asChild>
-                <Link href="/dashboard">View Dashboard</Link>
+                <Link href="#features">Learn More</Link>
               </Button>
             </div>
           </div>

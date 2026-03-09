@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +14,6 @@ import {
   Award, 
   Loader2, 
   Menu, 
-  X, 
   Plus,
   PencilLine,
   Timer,
@@ -56,12 +54,6 @@ export default function DashboardPage() {
   }, [firestore, user]);
 
   const { data: sessions, loading: sessionsLoading } = useCollection(sessionsCollection);
-
-  useEffect(() => {
-    if (!userLoading && !user) {
-      router.push('/login');
-    }
-  }, [user, userLoading, router]);
 
   if (userLoading || !user) {
     return (
@@ -144,10 +136,17 @@ export default function DashboardPage() {
       </nav>
 
       <div className="pt-6 border-t mt-6 pb-6 px-1">
-        <Button variant="ghost" className="w-full justify-start gap-3 px-3 text-muted-foreground hover:text-destructive" onClick={handleLogout}>
-          <LogOut className="h-4 w-4" />
-          Sign Out
-        </Button>
+        {user.isGuest ? (
+           <Button variant="ghost" className="w-full justify-start gap-3 px-3 text-muted-foreground hover:text-primary" asChild>
+             <Link href="/login">
+               <LogOut className="h-4 w-4" /> Sign In
+             </Link>
+           </Button>
+        ) : (
+          <Button variant="ghost" className="w-full justify-start gap-3 px-3 text-muted-foreground hover:text-destructive" onClick={handleLogout}>
+            <LogOut className="h-4 w-4" /> Sign Out
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -292,9 +291,9 @@ export default function DashboardPage() {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <p className="text-sm font-semibold truncate max-w-[150px] group-hover:text-primary transition-colors">{session.title}</p>
-                          <span className="text-xs font-bold text-primary">{session.results?.score}%</span>
+                          <span className="text-xs font-bold text-primary">{session.results?.score || 0}%</span>
                         </div>
-                        <Progress value={session.results?.score} className="h-1.5 md:h-2" />
+                        <Progress value={session.results?.score || 0} className="h-1.5 md:h-2" />
                         <p className="text-[10px] text-muted-foreground">{new Date(session.timestamp).toLocaleDateString()}</p>
                       </div>
                     </Link>
