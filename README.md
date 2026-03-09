@@ -40,6 +40,7 @@ git push -u origin main
 4. **Environment Variables**: This is the most important step. Add the following key:
    - **Key**: `GOOGLE_GENAI_API_KEY`
    - **Value**: [Insert your API Key from Google AI Studio]
+   *Note: Your Firebase API Key (starting with AIza...) is already hardcoded in `src/firebase/config.ts` and does not need to be added here.*
 5. Click **"Deploy"**.
 
 ## ⚠️ Troubleshooting
