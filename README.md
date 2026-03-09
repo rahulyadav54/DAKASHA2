@@ -39,21 +39,16 @@ To deploy this project to Vercel:
 
 ## ⚠️ Troubleshooting (Crucial)
 
-### "Identity Toolkit API has not been used" OR "Blocked"
-If you see login errors, you MUST perform these two steps in order:
+### Login Errors ("Identity Toolkit API" or "Blocked")
+If you enabled the providers and API but still see errors:
 
-1. **Enable the API**: [Click here to Enable Identity Toolkit API](https://console.developers.google.com/apis/api/identitytoolkit.googleapis.com/overview?project=ramiyaa-ff272).
-2. **Enable Email/Password Provider**: 
-   - Go to the [Firebase Console Authentication Tab](https://console.firebase.google.com/project/ramiyaa-ff272/authentication/providers).
-   - Click **"Add new provider"**.
-   - Select **"Email/Password"**.
-   - Enable it and click **"Save"**.
-
-### "Missing or insufficient permissions"
-- Ensure your `firestore.rules` in the Firebase Console matches the rules in this project.
+1. **Clear Browser Cache**: Or try an **Incognito window**.
+2. **Authorized Domains**: Go to [Firebase Authentication > Settings > Authorized Domains](https://console.firebase.google.com/project/ramiyaa-ff272/authentication/settings) and ensure `localhost` is listed.
+3. **Propagation Time**: Google Cloud changes can take up to 5 minutes to take effect.
+4. **Project ID Mismatch**: Double check that the project ID in `src/firebase/config.ts` matches the project where you enabled the API.
 
 ### AI Not Responding
 - Ensure the `GOOGLE_GENAI_API_KEY` is added to your Vercel environment variables.
 
-## 🏆 Hackathon Submission
-This project provides a comprehensive AI tutoring solution focused on accessibility, personalization, and modern learning techniques.
+### Missing or insufficient permissions (Firestore)
+- Ensure your `firestore.rules` in the Firebase Console matches the rules in this project.
