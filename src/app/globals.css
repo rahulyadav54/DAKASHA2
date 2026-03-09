@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -64,4 +65,13 @@
   h1, h2, h3, h4, h5, h6 {
     @apply font-headline font-bold tracking-tight;
   }
+}
+
+/* Custom classes for fonts and layouts */
+.font-body {
+  font-family: var(--font-inter), sans-serif;
+}
+
+.font-headline {
+  font-family: var(--font-space-grotesk), sans-serif;
 }

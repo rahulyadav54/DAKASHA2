@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,11 +28,12 @@ import Link from "next/link";
 import { Progress } from "@/components/ui/progress";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useUser, useAuth, useCollection, useDoc } from "@/firebase";
-import { collection, query, orderBy } from "firebase/firestore";
+import { collection, query, orderBy, limit } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -50,29 +52,32 @@ export default function DashboardPage() {
 
   const sessionsCollection = useMemo(() => {
     if (!firestore || !user) return null;
-    return query(collection(firestore, 'users', user.uid, 'sessions'), orderBy('timestamp', 'desc'));
+    return query(
+      collection(firestore, 'users', user.uid, 'sessions'), 
+      orderBy('timestamp', 'desc'),
+      limit(20)
+    );
   }, [firestore, user]);
 
   const { data: sessions, loading: sessionsLoading } = useCollection(sessionsCollection);
 
-  if (userLoading || !user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  const completedSessions = useMemo(() => {
+    return sessions?.filter(s => !!s.results) || [];
+  }, [sessions]);
 
-  const completedSessions = sessions?.filter(s => !!s.results) || [];
-  const recentSessions = completedSessions.slice(0, 3);
-  const avgScore = completedSessions.length 
-    ? Math.round(completedSessions.reduce((acc, s) => acc + (s.results?.score || 0), 0) / completedSessions.length) 
-    : 0;
+  const recentSessions = useMemo(() => completedSessions.slice(0, 3), [completedSessions]);
+  
+  const avgScore = useMemo(() => {
+    if (!completedSessions.length) return 0;
+    return Math.round(completedSessions.reduce((acc, s) => acc + (s.results?.score || 0), 0) / completedSessions.length);
+  }, [completedSessions]);
 
-  const chartData = [...completedSessions].reverse().map(s => ({
-    name: new Date(s.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' }),
-    score: s.results?.score || 0
-  }));
+  const chartData = useMemo(() => {
+    return [...completedSessions].reverse().map(s => ({
+      name: new Date(s.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' }),
+      score: s.results?.score || 0
+    }));
+  }, [completedSessions]);
 
   const handleLogout = async () => {
     if (auth) {
@@ -136,7 +141,7 @@ export default function DashboardPage() {
       </nav>
 
       <div className="pt-6 border-t mt-6 pb-6 px-1">
-        {user.isGuest ? (
+        {user?.isGuest ? (
            <Button variant="ghost" className="w-full justify-start gap-3 px-3 text-muted-foreground hover:text-primary" asChild>
              <Link href="/login">
                <LogOut className="h-4 w-4" /> Sign In
@@ -153,14 +158,12 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row">
-      {/* Sidebar - Desktop */}
       {!isMobile && (
         <aside className="w-64 border-r bg-white p-4 flex flex-col shrink-0 sticky top-0 h-screen">
           {NavContent}
         </aside>
       )}
 
-      {/* Header - Mobile */}
       {isMobile && (
         <header className="bg-white border-b p-4 flex items-center justify-between sticky top-0 z-40">
           <div className="flex items-center gap-2">
@@ -174,9 +177,9 @@ export default function DashboardPage() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-72 p-4">
-              <SheetHeader className="sr-only">
+              <SheetHeader>
                 <SheetTitle>Navigation Menu</SheetTitle>
-                <SheetDescription>Access app features and settings</SheetDescription>
+                <SheetDescription>Access your study tools and history</SheetDescription>
               </SheetHeader>
               {NavContent}
             </SheetContent>
@@ -188,7 +191,11 @@ export default function DashboardPage() {
         <div className="max-w-6xl mx-auto">
           <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div>
-              <h1 className="text-2xl md:text-3xl font-headline mb-1">Welcome back, {profile?.name || user.displayName || 'Learner'}!</h1>
+              {userLoading ? (
+                <Skeleton className="h-8 w-64 mb-2" />
+              ) : (
+                <h1 className="text-2xl md:text-3xl font-headline mb-1">Welcome back, {profile?.name || user?.displayName || 'Learner'}!</h1>
+              )}
               <p className="text-sm md:text-base text-muted-foreground">You are currently set as a <strong>{profile?.role || 'Student'}</strong>.</p>
             </div>
             <Button size="lg" className="rounded-full gap-2 w-full md:w-auto" asChild>
@@ -200,60 +207,26 @@ export default function DashboardPage() {
           </header>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-8">
-            <Card className="shadow-sm">
-              <CardContent className="pt-4 md:pt-6 p-4">
-                <div className="flex flex-col md:flex-row items-center md:items-start gap-2 md:gap-4 text-center md:text-left">
-                  <div className="p-2 md:p-3 rounded-full bg-blue-100 text-blue-600">
-                    <Award className="h-4 w-4 md:h-6 md:w-6" />
+            {[
+              { label: 'Avg. Score', value: `${avgScore}%`, icon: Award, color: 'bg-blue-100 text-blue-600' },
+              { label: 'Quizzes', value: completedSessions.length, icon: TrendingUp, color: 'bg-green-100 text-green-600' },
+              { label: 'Role', value: profile?.role || 'Student', icon: BookOpen, color: 'bg-purple-100 text-purple-600', hideOnMobile: true },
+              { label: 'Last Quiz', value: completedSessions[0] ? new Date(completedSessions[0].timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'N/A', icon: Calendar, color: 'bg-orange-100 text-orange-600' }
+            ].map((stat, i) => (
+              <Card key={i} className={cn("shadow-sm", stat.hideOnMobile && "hidden md:block")}>
+                <CardContent className="pt-4 md:pt-6 p-4">
+                  <div className="flex flex-col md:flex-row items-center md:items-start gap-2 md:gap-4 text-center md:text-left">
+                    <div className={cn("p-2 md:p-3 rounded-full", stat.color)}>
+                      <stat.icon className="h-4 w-4 md:h-6 md:w-6" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] md:text-sm font-medium text-muted-foreground">{stat.label}</p>
+                      {sessionsLoading ? <Skeleton className="h-6 w-12" /> : <h3 className="text-lg md:text-2xl font-bold">{stat.value}</h3>}
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[10px] md:text-sm font-medium text-muted-foreground">Avg. Score</p>
-                    <h3 className="text-lg md:text-2xl font-bold">{avgScore}%</h3>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="shadow-sm">
-              <CardContent className="pt-4 md:pt-6 p-4">
-                <div className="flex flex-col md:flex-row items-center md:items-start gap-2 md:gap-4 text-center md:text-left">
-                  <div className="p-2 md:p-3 rounded-full bg-green-100 text-green-600">
-                    <TrendingUp className="h-4 w-4 md:h-6 md:w-6" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] md:text-sm font-medium text-muted-foreground">Quizzes</p>
-                    <h3 className="text-lg md:text-2xl font-bold">{completedSessions.length}</h3>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="shadow-sm hidden md:block">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 rounded-full bg-purple-100 text-purple-600">
-                    <BookOpen className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Role</p>
-                    <h3 className="text-2xl font-bold">{profile?.role || 'Student'}</h3>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="shadow-sm">
-              <CardContent className="pt-4 md:pt-6 p-4">
-                <div className="flex flex-col md:flex-row items-center md:items-start gap-2 md:gap-4 text-center md:text-left">
-                  <div className="p-2 md:p-3 rounded-full bg-orange-100 text-orange-600">
-                    <Calendar className="h-4 w-4 md:h-6 md:w-6" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] md:text-sm font-medium text-muted-foreground">Last Quiz</p>
-                    <h3 className="text-lg md:text-2xl font-bold">
-                      {completedSessions[0] ? new Date(completedSessions[0].timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'N/A'}
-                    </h3>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            ))}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
@@ -264,19 +237,25 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent className="h-[250px] md:h-[300px] pt-4">
                 {sessionsLoading ? (
-                  <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin" /></div>
+                  <div className="h-full flex flex-col gap-4">
+                    <Skeleton className="h-full w-full" />
+                  </div>
                 ) : completedSessions.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="name" fontSize={10} tickMargin={10} />
-                      <YAxis domain={[0, 100]} fontSize={10} />
-                      <Tooltip />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                      <XAxis dataKey="name" fontSize={10} tickMargin={10} stroke="#64748B" />
+                      <YAxis domain={[0, 100]} fontSize={10} stroke="#64748B" />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                        cursor={{ fill: 'hsl(var(--primary) / 0.05)' }}
+                      />
                       <Bar dataKey="score" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                  <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-sm border-2 border-dashed rounded-xl">
+                    <BookOpen className="h-10 w-10 opacity-20 mb-2" />
                     Take your first quiz to see analytics!
                   </div>
                 )}
@@ -289,7 +268,14 @@ export default function DashboardPage() {
                 <CardDescription>Latest quiz sessions.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {recentSessions.length > 0 ? (
+                {sessionsLoading ? (
+                  Array(3).fill(0).map((_, i) => (
+                    <div key={i} className="space-y-2">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-2 w-3/4" />
+                    </div>
+                  ))
+                ) : recentSessions.length > 0 ? (
                   recentSessions.map((session) => (
                     <Link key={session.id} href={`/quiz/${session.id}/results`} className="block group">
                       <div className="space-y-2">
