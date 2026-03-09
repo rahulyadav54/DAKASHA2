@@ -1,3 +1,4 @@
+
 # SmartRead AI Tutor 🚀
 
 SmartRead AI is an advanced reading comprehension and adaptive learning platform. It transforms static text and PDF documents into interactive, personalized learning experiences using Google's Gemini AI.
@@ -37,10 +38,9 @@ git push -u origin main
 1. Go to [Vercel Dashboard](https://vercel.com/dashboard).
 2. Click **"Add New..."** > **"Project"**.
 3. Import your `Ai_hackathon` repository.
-4. **Environment Variables**: This is the most important step. Add the following key:
+4. **Environment Variables**: Add the following key:
    - **Key**: `GOOGLE_GENAI_API_KEY`
-   - **Value**: [Insert your API Key from Google AI Studio]
-   *Note: Your Firebase API Key (starting with AIza...) is already hardcoded in `src/firebase/config.ts` and does not need to be added here.*
+   - **Value**: `AIzaSyBlNohJjTsQweb1wy06wxWqAU5iXP8HrFU`
 5. Click **"Deploy"**.
 
 ## ⚠️ Troubleshooting
