@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BrainCircuit, Loader2, ArrowLeft, AlertCircle, ExternalLink, ShieldAlert, Info } from "lucide-react";
+import { BrainCircuit, Loader2, ArrowLeft, AlertCircle, ExternalLink, ShieldAlert, Info, Key } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useAuth, useUser } from "@/firebase";
@@ -109,23 +109,24 @@ export default function LoginPage() {
           {(apiError || blockedError) && (
             <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-destructive">
               <ShieldAlert className="h-4 w-4" />
-              <AlertTitle className="font-bold">Configuration Error</AlertTitle>
+              <AlertTitle className="font-bold">Configuration Required</AlertTitle>
               <AlertDescription className="text-xs space-y-3">
-                <p>Firebase is blocking login requests for project: <strong className="underline">ramiyaa-ff272</strong></p>
-                <div className="space-y-1">
-                  <p className="font-bold">Checklist to fix:</p>
-                  <ul className="list-disc pl-4 space-y-1">
-                    <li>Enable <strong>Email/Password</strong> in Firebase Auth Console.</li>
-                    <li>Enable <strong>Identity Toolkit API</strong> in Google Cloud Console.</li>
-                    <li>Wait ~5 minutes for Google to sync changes.</li>
-                  </ul>
-                </div>
-                <div className="flex flex-col gap-2 pt-2">
-                  <Button variant="outline" size="sm" className="bg-white text-destructive border-destructive" asChild>
-                    <a href="https://console.firebase.google.com/project/ramiyaa-ff272/authentication/providers" target="_blank" rel="noopener noreferrer">
-                      Open Firebase Console <ExternalLink className="ml-1 h-3 w-3" />
+                <p>Firebase is blocking login for: <strong className="underline">ramiyaa-ff272</strong></p>
+                <div className="space-y-2">
+                  <p className="font-bold flex items-center gap-1"><AlertCircle className="h-3 w-3" /> Step 1: Enable the Identity Toolkit API</p>
+                  <Button variant="outline" size="sm" className="w-full bg-white text-destructive border-destructive h-8 text-[10px]" asChild>
+                    <a href="https://console.developers.google.com/apis/api/identitytoolkit.googleapis.com/overview?project=ramiyaa-ff272" target="_blank" rel="noopener noreferrer">
+                      Enable Toolkit API <ExternalLink className="ml-1 h-3 w-3" />
                     </a>
                   </Button>
+                  
+                  <p className="font-bold flex items-center gap-1"><Key className="h-3 w-3" /> Step 2: Remove API Key Restrictions</p>
+                  <Button variant="outline" size="sm" className="w-full bg-white text-destructive border-destructive h-8 text-[10px]" asChild>
+                    <a href="https://console.cloud.google.com/apis/credentials?project=ramiyaa-ff272" target="_blank" rel="noopener noreferrer">
+                      Check Key Restrictions <ExternalLink className="ml-1 h-3 w-3" />
+                    </a>
+                  </Button>
+                  <p className="text-[9px] italic opacity-80">Find the key ending in <strong>HrFU</strong> and set "API restrictions" to "None".</p>
                 </div>
               </AlertDescription>
             </Alert>
@@ -195,7 +196,7 @@ export default function LoginPage() {
                 Skip to Dashboard (Demo Mode)
               </Link>
             </Button>
-            <p className="text-[10px] text-center text-muted-foreground mt-2">Use Demo Mode if Firebase configuration is still propagating.</p>
+            <p className="text-[10px] text-center text-muted-foreground mt-2">Use Demo Mode to bypass login for now.</p>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4 border-t pt-6 bg-slate-50/50 rounded-b-lg text-center">
