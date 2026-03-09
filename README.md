@@ -43,3 +43,5 @@ git push -u origin main
 
 ## 🏆 Hackathon Project
 This project was developed as a comprehensive AI tutoring solution, focusing on accessibility, personalization, and modern pedagogical techniques.
+
+# Ai_hackathon
