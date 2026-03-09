@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BrainCircuit, Loader2, ArrowLeft, AlertCircle, ExternalLink } from "lucide-react";
+import { BrainCircuit, Loader2, ArrowLeft, AlertCircle, ExternalLink, ShieldAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useAuth, useUser } from "@/firebase";
@@ -23,6 +23,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("password123");
   const [apiError, setApiError] = useState(false);
+  const [blockedError, setBlockedError] = useState(false);
 
   useEffect(() => {
     if (user && !userLoading) {
@@ -35,14 +36,18 @@ export default function LoginPage() {
     if (!auth) return;
     setLoading(true);
     setApiError(false);
+    setBlockedError(false);
     
     try {
       await signInWithEmailAndPassword(auth, email, password);
       router.push('/dashboard');
     } catch (error: any) {
       console.error(error);
-      if (error.message.includes("identity-toolkit-api")) {
+      const errorMsg = error.message.toLowerCase();
+      if (errorMsg.includes("identity-toolkit-api")) {
         setApiError(true);
+      } else if (errorMsg.includes("blocked") || errorMsg.includes("operation-not-allowed")) {
+        setBlockedError(true);
       }
       toast({
         title: "Login failed",
@@ -58,13 +63,17 @@ export default function LoginPage() {
     if (!auth) return;
     setLoading(true);
     setApiError(false);
+    setBlockedError(false);
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
       router.push('/dashboard');
     } catch (error: any) {
-      if (error.message.includes("identity-toolkit-api")) {
+      const errorMsg = error.message.toLowerCase();
+      if (errorMsg.includes("identity-toolkit-api")) {
         setApiError(true);
+      } else if (errorMsg.includes("blocked")) {
+        setBlockedError(true);
       }
       toast({
         title: "Google login failed",
@@ -100,6 +109,22 @@ export default function LoginPage() {
                     Click here to Enable API <ExternalLink className="h-3 w-3" />
                   </a>
                 </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {blockedError && (
+            <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-destructive">
+              <ShieldAlert className="h-4 w-4" />
+              <AlertTitle className="font-bold">Provider Blocked</AlertTitle>
+              <AlertDescription className="text-xs space-y-2">
+                <p>The <strong>Email/Password</strong> sign-in method is disabled in your Firebase settings.</p>
+                <Button variant="link" size="sm" className="h-auto p-0 text-destructive font-bold underline flex items-center gap-1" asChild>
+                  <a href="https://console.firebase.google.com/project/ramiyaa-ff272/authentication/providers" target="_blank" rel="noopener noreferrer">
+                    Click here to Enable Providers <ExternalLink className="h-3 w-3" />
+                  </a>
+                </Button>
+                <p className="font-bold mt-2">Steps: Add Provider > Email/Password > Enable > Save.</p>
               </AlertDescription>
             </Alert>
           )}

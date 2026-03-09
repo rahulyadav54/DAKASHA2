@@ -21,40 +21,39 @@ SmartRead AI is an advanced reading comprehension and adaptive learning platform
 
 ## 🚀 Deployment to Vercel
 
-To deploy this project to Vercel, follow these steps:
+To deploy this project to Vercel:
 
-### 1. Push to GitHub
-Open your terminal in the project root and run:
-```bash
-git init
-git add .
-git commit -m "Final submission for AI Hackathon"
-git branch -M main
-git remote add origin https://github.com/rahulyadav54/Ai_hackathon.git
-git push -u origin main
-```
+1. **Push to GitHub**:
+   ```bash
+   git init
+   git add .
+   git commit -m "Final submission for AI Hackathon"
+   git branch -M main
+   git remote add origin https://github.com/rahulyadav54/Ai_hackathon.git
+   git push -u origin main
+   ```
 
-### 2. Configure Vercel
-1. Go to [Vercel Dashboard](https://vercel.com/dashboard).
-2. Click **"Add New..."** > **"Project"**.
-3. Import your `Ai_hackathon` repository.
-4. **Environment Variables**: Add the following key:
-   - **Key**: `GOOGLE_GENAI_API_KEY`
-   - **Value**: `AIzaSyBlNohJjTsQweb1wy06wxWqAU5iXP8HrFU`
-5. Click **"Deploy"**.
+2. **Configure Vercel**:
+   - Link your repo in the Vercel dashboard.
+   - **Environment Variables**: Add `GOOGLE_GENAI_API_KEY` with your Gemini key from [Google AI Studio](https://aistudio.google.com/).
 
-## ⚠️ Troubleshooting
+## ⚠️ Troubleshooting (Crucial)
 
-### "Identity Toolkit API has not been used"
-If you see this error during login, you MUST enable the API in your Google Cloud Console:
-- [Click here to Enable Identity Toolkit API](https://console.developers.google.com/apis/api/identitytoolkit.googleapis.com/overview?project=ramiyaa-ff272)
-- Alternatively, go to the [Firebase Console Authentication Tab](https://console.firebase.google.com/project/ramiyaa-ff272/authentication/providers) and ensure **Email/Password** and **Google** sign-in are enabled.
+### "Identity Toolkit API has not been used" OR "Blocked"
+If you see login errors, you MUST perform these two steps in order:
+
+1. **Enable the API**: [Click here to Enable Identity Toolkit API](https://console.developers.google.com/apis/api/identitytoolkit.googleapis.com/overview?project=ramiyaa-ff272).
+2. **Enable Email/Password Provider**: 
+   - Go to the [Firebase Console Authentication Tab](https://console.firebase.google.com/project/ramiyaa-ff272/authentication/providers).
+   - Click **"Add new provider"**.
+   - Select **"Email/Password"**.
+   - Enable it and click **"Save"**.
 
 ### "Missing or insufficient permissions"
-- This usually means the Firestore rules are not deployed. Ensure your `firestore.rules` in the Firebase Console matches the one in this project.
+- Ensure your `firestore.rules` in the Firebase Console matches the rules in this project.
 
 ### AI Not Responding
-- Ensure the `GOOGLE_GENAI_API_KEY` is added to your Vercel environment variables. Without this, the server-side Genkit flows will fail.
+- Ensure the `GOOGLE_GENAI_API_KEY` is added to your Vercel environment variables.
 
 ## 🏆 Hackathon Submission
-This project was developed as a comprehensive AI tutoring solution, focusing on accessibility, personalization, and modern pedagogical techniques.
+This project provides a comprehensive AI tutoring solution focused on accessibility, personalization, and modern learning techniques.
