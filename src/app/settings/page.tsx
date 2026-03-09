@@ -30,7 +30,7 @@ import { useUser, useDoc, useAuth } from "@/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 export default function SettingsPage() {
@@ -176,6 +176,10 @@ export default function SettingsPage() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-72 p-4">
+              <SheetHeader className="sr-only">
+                <SheetTitle>Settings Navigation</SheetTitle>
+                <SheetDescription>Access your profile settings and features</SheetDescription>
+              </SheetHeader>
               {NavContent}
             </SheetContent>
           </Sheet>

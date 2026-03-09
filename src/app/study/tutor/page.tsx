@@ -30,7 +30,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -264,6 +264,10 @@ export default function AiTutorPage() {
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="w-[85%] p-6">
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>Chat History</SheetTitle>
+                    <SheetDescription>Access your recent AI Tutor conversations</SheetDescription>
+                  </SheetHeader>
                   {HistoryList}
                 </SheetContent>
               </Sheet>

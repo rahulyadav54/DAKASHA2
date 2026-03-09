@@ -30,7 +30,7 @@ import { useUser, useAuth, useCollection, useDoc } from "@/firebase";
 import { collection, query, orderBy } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 export default function DashboardPage() {
@@ -174,6 +174,10 @@ export default function DashboardPage() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-72 p-4">
+              <SheetHeader className="sr-only">
+                <SheetTitle>Navigation Menu</SheetTitle>
+                <SheetDescription>Access app features and settings</SheetDescription>
+              </SheetHeader>
               {NavContent}
             </SheetContent>
           </Sheet>
