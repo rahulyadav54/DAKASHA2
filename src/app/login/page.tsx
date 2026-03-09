@@ -106,32 +106,27 @@ export default function LoginPage() {
           <CardDescription>Enter your details to access your dashboard</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {apiError && (
-            <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle className="font-bold">API Not Enabled</AlertTitle>
-              <AlertDescription className="text-xs space-y-2">
-                <p>The Identity Toolkit API is required. If you just enabled it, please wait 2 minutes.</p>
-                <Button variant="link" size="sm" className="h-auto p-0 text-destructive font-bold underline flex items-center gap-1" asChild>
-                  <a href="https://console.developers.google.com/apis/api/identitytoolkit.googleapis.com/overview?project=ramiyaa-ff272" target="_blank" rel="noopener noreferrer">
-                    Enable API Now <ExternalLink className="h-3 w-3" />
-                  </a>
-                </Button>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {blockedError && (
+          {(apiError || blockedError) && (
             <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-destructive">
               <ShieldAlert className="h-4 w-4" />
-              <AlertTitle className="font-bold">Method Blocked</AlertTitle>
-              <AlertDescription className="text-xs space-y-2">
-                <p>Auth methods might still be propagating. <strong>Try refreshing the page or using an Incognito window.</strong></p>
-                <Button variant="link" size="sm" className="h-auto p-0 text-destructive font-bold underline flex items-center gap-1" asChild>
-                  <a href="https://console.firebase.google.com/project/ramiyaa-ff272/authentication/providers" target="_blank" rel="noopener noreferrer">
-                    Verify Providers in Console <ExternalLink className="h-3 w-3" />
-                  </a>
-                </Button>
+              <AlertTitle className="font-bold">Configuration Error</AlertTitle>
+              <AlertDescription className="text-xs space-y-3">
+                <p>Firebase is blocking login requests for project: <strong className="underline">ramiyaa-ff272</strong></p>
+                <div className="space-y-1">
+                  <p className="font-bold">Checklist to fix:</p>
+                  <ul className="list-disc pl-4 space-y-1">
+                    <li>Enable <strong>Email/Password</strong> in Firebase Auth Console.</li>
+                    <li>Enable <strong>Identity Toolkit API</strong> in Google Cloud Console.</li>
+                    <li>Wait ~5 minutes for Google to sync changes.</li>
+                  </ul>
+                </div>
+                <div className="flex flex-col gap-2 pt-2">
+                  <Button variant="outline" size="sm" className="bg-white text-destructive border-destructive" asChild>
+                    <a href="https://console.firebase.google.com/project/ramiyaa-ff272/authentication/providers" target="_blank" rel="noopener noreferrer">
+                      Open Firebase Console <ExternalLink className="ml-1 h-3 w-3" />
+                    </a>
+                  </Button>
+                </div>
               </AlertDescription>
             </Alert>
           )}
@@ -194,11 +189,14 @@ export default function LoginPage() {
             Continue with Google
           </Button>
 
-          <Button variant="ghost" className="w-full h-12 rounded-xl border-dashed border-2 hover:bg-slate-50" asChild>
-            <Link href="/dashboard">
-              Skip to Dashboard (Guest)
-            </Link>
-          </Button>
+          <div className="pt-4">
+            <Button variant="secondary" className="w-full h-14 rounded-2xl border-2 border-primary/20 hover:bg-primary/5 text-primary font-bold shadow-sm" asChild>
+              <Link href="/dashboard">
+                Skip to Dashboard (Demo Mode)
+              </Link>
+            </Button>
+            <p className="text-[10px] text-center text-muted-foreground mt-2">Use Demo Mode if Firebase configuration is still propagating.</p>
+          </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4 border-t pt-6 bg-slate-50/50 rounded-b-lg text-center">
           <div className="text-sm text-muted-foreground">
