@@ -21,7 +21,8 @@ import {
   Bot,
   BookOpenText,
   Users,
-  Trophy
+  Trophy,
+  AlertCircle
 } from "lucide-react";
 import Link from "next/link";
 import { Progress } from "@/components/ui/progress";
@@ -33,6 +34,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -42,7 +44,7 @@ export default function DashboardPage() {
   const isMobile = useIsMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Protected route logic
+  // Protected route logic - check for real user OR guest user
   useEffect(() => {
     if (!userLoading && !user) {
       router.push('/login');
@@ -50,14 +52,14 @@ export default function DashboardPage() {
   }, [user, userLoading, router]);
 
   const userProfileRef = useMemo(() => {
-    if (!user) return null;
+    if (!user || user.isGuest) return null;
     return `users/${user.uid}`;
   }, [user]);
 
   const { data: profile } = useDoc(userProfileRef);
 
   const sessionsCollection = useMemo(() => {
-    if (!firestore || !user) return null;
+    if (!firestore || !user || user.isGuest) return null;
     return query(
       collection(firestore, 'users', user.uid, 'sessions'), 
       orderBy('timestamp', 'desc'),
@@ -74,18 +76,31 @@ export default function DashboardPage() {
   const recentSessions = useMemo(() => completedSessions.slice(0, 3), [completedSessions]);
   
   const avgScore = useMemo(() => {
-    if (!completedSessions.length) return 0;
+    if (!completedSessions.length) return user?.isGuest ? 85 : 0;
     return Math.round(completedSessions.reduce((acc, s) => acc + (s.results?.score || 0), 0) / completedSessions.length);
-  }, [completedSessions]);
+  }, [completedSessions, user]);
 
   const chartData = useMemo(() => {
+    if (user?.isGuest && !completedSessions.length) {
+      return [
+        { name: 'Mon', score: 65 },
+        { name: 'Tue', score: 78 },
+        { name: 'Wed', score: 82 },
+        { name: 'Thu', score: 90 },
+      ];
+    }
     return [...completedSessions].reverse().map(s => ({
       name: new Date(s.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' }),
       score: s.results?.score || 0
     }));
-  }, [completedSessions]);
+  }, [completedSessions, user]);
 
   const handleLogout = async () => {
+    if (user?.isGuest) {
+      localStorage.removeItem('demo_user');
+      router.push('/');
+      return;
+    }
     if (auth) {
       await signOut(auth);
       router.push('/');
@@ -197,6 +212,16 @@ export default function DashboardPage() {
 
       <main className="flex-1 p-4 md:p-10 overflow-auto">
         <div className="max-w-6xl mx-auto">
+          {user?.isGuest && (
+             <Alert className="mb-8 border-primary bg-primary/5 text-primary">
+               <Bot className="h-4 w-4" />
+               <AlertTitle className="font-bold">Demo Mode Active</AlertTitle>
+               <AlertDescription>
+                 Firebase API is currently unavailable. Progress will not be saved to the cloud, but you can still test all AI features.
+               </AlertDescription>
+             </Alert>
+          )}
+
           <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div>
               <h1 className="text-2xl md:text-3xl font-headline mb-1">Welcome back, {profile?.name || user?.displayName || 'Learner'}!</h1>
@@ -213,9 +238,9 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-8">
             {[
               { label: 'Avg. Score', value: `${avgScore}%`, icon: Award, color: 'bg-blue-100 text-blue-600' },
-              { label: 'Quizzes', value: completedSessions.length, icon: TrendingUp, color: 'bg-green-100 text-green-600' },
+              { label: 'Quizzes', value: completedSessions.length || (user?.isGuest ? 4 : 0), icon: TrendingUp, color: 'bg-green-100 text-green-600' },
               { label: 'Role', value: profile?.role || 'Student', icon: BookOpen, color: 'bg-purple-100 text-purple-600', hideOnMobile: true },
-              { label: 'Last Quiz', value: completedSessions[0] ? new Date(completedSessions[0].timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'N/A', icon: Calendar, color: 'bg-orange-100 text-orange-600' }
+              { label: 'Last Quiz', value: completedSessions[0] ? new Date(completedSessions[0].timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' }) : (user?.isGuest ? 'Today' : 'N/A'), icon: Calendar, color: 'bg-orange-100 text-orange-600' }
             ].map((stat, i) => (
               <Card key={i} className={cn("shadow-sm", stat.hideOnMobile && "hidden md:block")}>
                 <CardContent className="pt-4 md:pt-6 p-4">
@@ -244,7 +269,7 @@ export default function DashboardPage() {
                   <div className="h-full flex flex-col gap-4">
                     <Skeleton className="h-full w-full" />
                   </div>
-                ) : completedSessions.length > 0 ? (
+                ) : (completedSessions.length > 0 || user?.isGuest) ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
@@ -293,7 +318,12 @@ export default function DashboardPage() {
                     </Link>
                   ))
                 ) : (
-                  <p className="text-sm text-center text-muted-foreground py-10">No recent quizzes found.</p>
+                  <div className="text-center py-10 space-y-4">
+                    <p className="text-sm text-muted-foreground">No recent quizzes found.</p>
+                    {user?.isGuest && (
+                      <p className="text-[10px] text-primary italic font-bold">In Demo Mode, quizzes are generated but not saved to cloud.</p>
+                    )}
+                  </div>
                 )}
                 <Button variant="outline" className="w-full text-xs" asChild>
                   <Link href="/dashboard">View All History</Link>

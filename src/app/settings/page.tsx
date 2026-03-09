@@ -21,7 +21,8 @@ import {
   Bot,
   BookOpenText,
   Users,
-  Trophy
+  Trophy,
+  ShieldAlert
 } from "lucide-react";
 import Link from "next/link";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -32,6 +33,7 @@ import { signOut } from "firebase/auth";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -42,7 +44,7 @@ export default function SettingsPage() {
   const isMobile = useIsMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const profileRefStr = useMemo(() => user ? `users/${user.uid}` : null, [user]);
+  const profileRefStr = useMemo(() => (!user || user.isGuest) ? null : `users/${user.uid}`, [user]);
   const { data: profile, loading: profileLoading } = useDoc(profileRefStr);
 
   const [name, setName] = useState("");
@@ -53,10 +55,17 @@ export default function SettingsPage() {
     if (profile) {
       setName(profile.name || "");
       setRole(profile.role || "Student");
+    } else if (user?.isGuest) {
+      setName(user.displayName || "Demo Learner");
+      setRole("Student");
     }
-  }, [profile]);
+  }, [profile, user]);
 
   const handleSave = async () => {
+    if (user?.isGuest) {
+      toast({ title: "Demo Mode", description: "Profile changes are local-only in demo mode." });
+      return;
+    }
     if (!user || !firestore) return;
     setSaving(true);
     try {
@@ -75,6 +84,11 @@ export default function SettingsPage() {
   };
 
   const handleLogout = async () => {
+    if (user?.isGuest) {
+      localStorage.removeItem('demo_user');
+      router.push('/');
+      return;
+    }
     if (auth) {
       await signOut(auth);
       router.push('/');
@@ -136,33 +150,23 @@ export default function SettingsPage() {
       </nav>
 
       <div className="pt-6 border-t mt-6 pb-6 px-1">
-        {user?.isGuest ? (
-           <Button variant="ghost" className="w-full justify-start gap-3 px-3 text-muted-foreground hover:text-primary" asChild>
-             <Link href="/login">
-               <LogOut className="h-4 w-4" /> Sign In
-             </Link>
-           </Button>
-        ) : (
-          <Button variant="ghost" className="w-full justify-start gap-3 px-3 text-muted-foreground hover:text-destructive" onClick={handleLogout}>
-            <LogOut className="h-4 w-4" /> Sign Out
-          </Button>
-        )}
+        <Button variant="ghost" className="w-full justify-start gap-3 px-3 text-muted-foreground hover:text-destructive" onClick={handleLogout}>
+          <LogOut className="h-4 w-4" /> Sign Out
+        </Button>
       </div>
     </div>
   );
 
-  if (userLoading || profileLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
+  if (userLoading || (profileLoading && !user?.isGuest)) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row">
-      {/* Sidebar - Desktop */}
       {!isMobile && (
         <aside className="w-64 border-r bg-white p-4 flex flex-col shrink-0 sticky top-0 h-screen">
           {NavContent}
         </aside>
       )}
 
-      {/* Header - Mobile */}
       {isMobile && (
         <header className="bg-white border-b p-4 flex items-center justify-between sticky top-0 z-40">
           <div className="flex items-center gap-2">
@@ -188,6 +192,16 @@ export default function SettingsPage() {
 
       <main className="flex-1 p-4 md:p-10">
         <div className="max-w-3xl mx-auto">
+          {user?.isGuest && (
+             <Alert variant="destructive" className="mb-8 border-primary bg-primary/5 text-primary">
+               <ShieldAlert className="h-4 w-4" />
+               <AlertTitle className="font-bold">Guest Account</AlertTitle>
+               <AlertDescription>
+                 You are logged in via Demo Mode. Changes here will not be synced to the cloud.
+               </AlertDescription>
+             </Alert>
+          )}
+
           <header className="mb-8 flex items-center gap-4">
              <Button variant="ghost" size="icon" asChild><Link href="/dashboard"><ArrowLeft className="h-5 w-5" /></Link></Button>
              <h1 className="text-2xl md:text-3xl font-headline">Account Settings</h1>
@@ -229,12 +243,12 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Email Address</Label>
                 <Input 
-                  value={user?.email || "guest@smartread.ai"} 
+                  value={user?.email || "demo@smartread.ai"} 
                   readOnly 
                   disabled
                   className="h-12 bg-muted/30"
                 />
-                <p className="text-[10px] text-muted-foreground italic">Email changes are disabled for this account type.</p>
+                <p className="text-[10px] text-muted-foreground italic">Email changes are disabled.</p>
               </div>
             </CardContent>
             <CardFooter className="border-t bg-muted/10 px-6 py-4 rounded-b-lg">

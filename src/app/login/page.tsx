@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -25,7 +24,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("password123");
   const [apiError, setApiError] = useState(false);
   const [blockedError, setBlockedError] = useState(false);
-  const [rawError, setRawError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user && !userLoading) {
@@ -33,21 +31,35 @@ export default function LoginPage() {
     }
   }, [user, userLoading, router]);
 
+  const handleDemoMode = () => {
+    const mockUser = {
+      uid: 'demo-user-' + Math.random().toString(36).substr(2, 5),
+      displayName: 'Demo Learner',
+      email: 'demo@smartread.ai',
+      photoURL: 'https://picsum.photos/seed/demo/100/100'
+    };
+    localStorage.setItem('demo_user', JSON.stringify(mockUser));
+    toast({
+      title: "Demo Mode Active",
+      description: "You are now exploring SmartRead AI in guest mode.",
+    });
+    router.push('/dashboard');
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!auth) return;
     setLoading(true);
     setApiError(false);
     setBlockedError(false);
-    setRawError(null);
     
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      localStorage.removeItem('demo_user'); // Clear demo if real login works
       router.push('/dashboard');
     } catch (error: any) {
       console.error("Login Error:", error);
-      const errorMsg = error.message.toLowerCase();
-      setRawError(error.message);
+      const errorMsg = (error.message || "").toLowerCase();
       
       if (errorMsg.includes("identity-toolkit-api")) {
         setApiError(true);
@@ -70,13 +82,11 @@ export default function LoginPage() {
     setLoading(true);
     setApiError(false);
     setBlockedError(false);
-    setRawError(null);
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const loggedUser = result.user;
 
-      // Check if profile exists, if not create it
       const userDocRef = doc(firestore, 'users', loggedUser.uid);
       const userDoc = await getDoc(userDocRef);
 
@@ -90,6 +100,7 @@ export default function LoginPage() {
         });
       }
 
+      localStorage.removeItem('demo_user');
       toast({
         title: "Welcome!",
         description: `Signed in as ${loggedUser.displayName || loggedUser.email}`,
@@ -97,7 +108,6 @@ export default function LoginPage() {
       router.push('/dashboard');
     } catch (error: any) {
       console.error("Google Login Error:", error);
-      setRawError(error.message);
       const errorMsg = (error.message || "").toLowerCase();
       if (errorMsg.includes("identity-toolkit-api")) {
         setApiError(true);
@@ -183,39 +193,39 @@ export default function LoginPage() {
           {(apiError || blockedError) && (
             <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-destructive mt-6 rounded-2xl">
               <ShieldAlert className="h-5 w-5" />
-              <AlertTitle className="font-bold">Configuration Issue</AlertTitle>
+              <AlertTitle className="font-bold">Configuration Required</AlertTitle>
               <AlertDescription className="text-xs space-y-4 pt-2">
-                <p>Google is blocking sign-in for Project ID: <strong className="underline">ramiyaa-ff272</strong></p>
+                <p>Firebase is blocking login for: <strong className="underline">ramiyaa-ff272</strong></p>
+                
                 <div className="space-y-3">
-                  <div className="p-3 bg-white rounded-xl space-y-2 border">
-                    <p className="font-bold text-[10px] flex items-center gap-1"><AlertCircle className="h-3 w-3" /> Step 1: Enable Identity Toolkit</p>
-                    <Button variant="link" size="sm" className="h-auto p-0 text-[10px] text-blue-600 font-bold" asChild>
-                      <a href="https://console.developers.google.com/apis/api/identitytoolkit.googleapis.com/overview?project=ramiyaa-ff272" target="_blank" rel="noopener noreferrer">
-                        Open GCP Console <ExternalLink className="ml-1 h-3 w-3" />
-                      </a>
-                    </Button>
-                  </div>
-                  
-                  <div className="p-3 bg-white rounded-xl space-y-2 border">
-                    <p className="font-bold text-[10px] flex items-center gap-1"><Key className="h-3 w-3" /> Step 2: Unrestrict API Key</p>
-                    <Button variant="link" size="sm" className="h-auto p-0 text-[10px] text-blue-600 font-bold" asChild>
-                      <a href="https://console.cloud.google.com/apis/credentials?project=ramiyaa-ff272" target="_blank" rel="noopener noreferrer">
-                        Check Key Restrictions <ExternalLink className="ml-1 h-3 w-3" />
-                      </a>
-                    </Button>
-                  </div>
+                   <div className="flex items-center gap-2 text-sm font-bold">
+                     <AlertCircle className="h-4 w-4" /> Step 1: Enable the Identity Toolkit API
+                   </div>
+                   <Button variant="outline" size="sm" className="w-full bg-white text-destructive border-destructive/30" asChild>
+                     <a href="https://console.developers.google.com/apis/api/identitytoolkit.googleapis.com/overview?project=ramiyaa-ff272" target="_blank" rel="noopener noreferrer">
+                       Enable Toolkit API <ExternalLink className="ml-2 h-3 w-3" />
+                     </a>
+                   </Button>
+
+                   <div className="flex items-center gap-2 text-sm font-bold pt-2">
+                     <Key className="h-4 w-4" /> Step 2: Remove API Key Restrictions
+                   </div>
+                   <Button variant="outline" size="sm" className="w-full bg-white text-destructive border-destructive/30" asChild>
+                     <a href="https://console.cloud.google.com/apis/credentials?project=ramiyaa-ff272" target="_blank" rel="noopener noreferrer">
+                       Check Key Restrictions <ExternalLink className="ml-2 h-3 w-3" />
+                     </a>
+                   </Button>
+                   <p className="text-[10px] italic opacity-80">Find the key ending in <strong>HrFU</strong> and set "API restrictions" to "None".</p>
                 </div>
               </AlertDescription>
             </Alert>
           )}
           
           <div className="pt-2">
-            <Button variant="secondary" className="w-full h-14 rounded-2xl border-2 border-primary/10 hover:bg-primary/5 text-primary font-bold shadow-sm gap-2" asChild>
-              <Link href="/dashboard">
-                <Sparkles className="h-4 w-4" /> Demo Mode (Bypass Login)
-              </Link>
+            <Button variant="secondary" className="w-full h-14 rounded-2xl border-2 border-primary/10 hover:bg-primary/5 text-primary font-bold shadow-sm gap-2" onClick={handleDemoMode}>
+              <Sparkles className="h-4 w-4" /> Demo Mode (Bypass Login)
             </Button>
-            <p className="text-[10px] text-center text-muted-foreground mt-2 italic">Use Demo Mode to present without active Firebase Auth.</p>
+            <p className="text-[10px] text-center text-muted-foreground mt-2 italic">Use Demo Mode if your Firebase API is currently blocked.</p>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4 border-t pt-6 bg-slate-50/50 text-center">
