@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -18,7 +19,8 @@ import {
   BookOpen, 
   Info,
   FileText,
-  HelpCircle
+  HelpCircle,
+  AlertCircle
 } from "lucide-react";
 import { semanticAnswerEvaluator } from "@/ai/flows/semantic-answer-evaluator-flow";
 import { useToast } from "@/hooks/use-toast";
@@ -27,6 +29,7 @@ import { doc, updateDoc } from "firebase/firestore";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function QuizSessionPage() {
   const { id } = useParams();
@@ -47,12 +50,6 @@ export default function QuizSessionPage() {
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("question");
 
-  useEffect(() => {
-    if (!sessionLoading && !session && sessionRefStr) {
-      router.push('/dashboard');
-    }
-  }, [session, sessionLoading, router, sessionRefStr]);
-
   const allQuestions = useMemo(() => {
     if (!session?.questions) return [];
     return [
@@ -63,10 +60,28 @@ export default function QuizSessionPage() {
     ];
   }, [session]);
 
-  if (sessionLoading || !session) {
+  if (sessionLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="animate-spin text-primary" />
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="animate-spin h-10 w-10 text-primary" />
+          <p className="text-sm text-muted-foreground font-medium">Loading your session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session && !sessionLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+        <Alert variant="destructive" className="max-w-md mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Quiz Not Found</AlertTitle>
+          <AlertDescription>
+            The quiz session you're looking for doesn't exist or hasn't loaded yet.
+          </AlertDescription>
+        </Alert>
+        <Button onClick={() => router.push('/dashboard')}>Back to Dashboard</Button>
       </div>
     );
   }
@@ -136,24 +151,21 @@ export default function QuizSessionPage() {
       const docRef = doc(firestore, 'users', user.uid, 'sessions', id as string);
       
       try {
-        // Await the update before redirecting
         await updateDoc(docRef, { results });
         router.push(`/quiz/${id}/results`);
       } catch (err: any) {
-        console.error("Firestore Update Error:", err);
         const permissionError = new FirestorePermissionError({
           path: docRef.path,
           operation: 'update',
           requestResourceData: { results },
         });
         errorEmitter.emit('permission-error', permissionError);
-        throw new Error("Failed to save results. Check your database permissions.");
+        throw new Error("Failed to save results.");
       }
 
     } catch (error) {
-      console.error(error);
       toast({
-        title: "Submission failed",
+        title: "Grading failed",
         description: "There was a problem grading your quiz. Please try again.",
         variant: "destructive"
       });

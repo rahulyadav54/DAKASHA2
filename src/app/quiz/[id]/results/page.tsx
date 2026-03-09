@@ -1,9 +1,9 @@
+
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { store } from "@/lib/store";
-import { QuizSession } from "@/lib/types";
+import { QuizResult, AnswerEvaluation } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -11,32 +11,63 @@ import {
   CheckCircle2, 
   XCircle, 
   ArrowLeft, 
-  LayoutDashboard, 
   Award,
   BookOpen,
   HelpCircle,
   Lightbulb,
   Share2,
-  Info
+  Info,
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 import Link from "next/link";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useUser, useDoc } from "@/firebase";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function QuizResultsPage() {
   const { id } = useParams();
   const router = useRouter();
-  const [session, setSession] = useState<QuizSession | null>(null);
+  const { user } = useUser();
 
-  useEffect(() => {
-    const s = store.getSession(id as string);
-    if (s && s.results) setSession(s);
-    else if (s) router.push(`/quiz/${id}`);
-    else router.push('/dashboard');
-  }, [id, router]);
+  const sessionPath = useMemo(() => {
+    if (!user || !id) return null;
+    return `users/${user.uid}/sessions/${id}`;
+  }, [user, id]);
 
-  if (!session || !session.results) return null;
+  const { data: session, loading } = useDoc<any>(sessionPath);
 
-  const results = session.results;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="animate-spin h-10 w-10 text-primary" />
+          <p className="text-sm font-medium text-muted-foreground">Loading results...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session || !session.results) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-background">
+        <Alert className="max-w-md mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Results Not Found</AlertTitle>
+          <AlertDescription>
+            We couldn't find the results for this quiz. You might need to finish the assessment first.
+          </AlertDescription>
+        </Alert>
+        <Button asChild>
+          <Link href={session ? `/quiz/${id}` : "/dashboard"}>
+            {session ? "Take Quiz" : "Back to Dashboard"}
+          </Link>
+        </Button>
+      </div>
+    );
+  }
+
+  const results: QuizResult = session.results;
 
   return (
     <div className="min-h-screen bg-background p-6 md:p-12">
@@ -121,7 +152,7 @@ export default function QuizResultsPage() {
                Question Review
              </h2>
              <Accordion type="single" collapsible className="space-y-4">
-               {results.evaluations.map((evalItem, idx) => (
+               {results.evaluations.map((evalItem: AnswerEvaluation, idx: number) => (
                  <AccordionItem key={idx} value={`item-${idx}`} className="border rounded-xl bg-white px-4 overflow-hidden shadow-sm">
                    <AccordionTrigger className="hover:no-underline py-4">
                      <div className="flex items-center gap-4 text-left">
@@ -182,11 +213,11 @@ export default function QuizResultsPage() {
                <CardContent className="space-y-4">
                   <div className="flex gap-3 items-start p-3 rounded-lg bg-accent/5">
                     <BookOpen className="h-5 w-5 text-accent mt-0.5" />
-                    <p className="text-sm">Read the section on <strong>Photosynthesis Mechanisms</strong> again.</p>
+                    <p className="text-sm">Read the section on <strong>Key Concepts</strong> again.</p>
                   </div>
                   <div className="flex gap-3 items-start p-3 rounded-lg bg-accent/5">
                     <Award className="h-5 w-5 text-accent mt-0.5" />
-                    <p className="text-sm">Difficulty increased! Your next quiz will be at <strong>Advanced Level</strong>.</p>
+                    <p className="text-sm">Keep up the great work! Your progress is being tracked.</p>
                   </div>
                   <Button className="w-full mt-2" asChild>
                     <Link href="/quiz/new">New Assessment</Link>
@@ -196,15 +227,15 @@ export default function QuizResultsPage() {
 
              <Card className="shadow-md bg-accent text-accent-foreground">
                 <CardHeader>
-                  <CardTitle className="text-lg font-headline">Parent/Teacher Note</CardTitle>
+                  <CardTitle className="text-lg font-headline">Session Summary</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm opacity-90 leading-relaxed mb-4">
-                    Alex showed a strong grasp of foundational concepts but struggled with inferential questions. 
-                    Targeted practice on "Why" and "How" questions is recommended for the next session.
+                    You finished this quiz on {new Date(session.timestamp).toLocaleDateString()}.
+                    Use the feedback above to improve your understanding of the material.
                   </p>
                   <Button variant="secondary" size="sm" className="w-full" asChild>
-                    <Link href="/dashboard">View Full Progress Report</Link>
+                    <Link href="/dashboard">Return to Dashboard</Link>
                   </Button>
                 </CardContent>
              </Card>
