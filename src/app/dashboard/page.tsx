@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
@@ -42,6 +41,13 @@ export default function DashboardPage() {
   const { user, loading: userLoading } = useUser();
   const isMobile = useIsMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Protected route logic
+  useEffect(() => {
+    if (!userLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, userLoading, router]);
 
   const userProfileRef = useMemo(() => {
     if (!user) return null;
@@ -141,20 +147,22 @@ export default function DashboardPage() {
       </nav>
 
       <div className="pt-6 border-t mt-6 pb-6 px-1">
-        {user?.isGuest ? (
-           <Button variant="ghost" className="w-full justify-start gap-3 px-3 text-muted-foreground hover:text-primary" asChild>
-             <Link href="/login">
-               <LogOut className="h-4 w-4" /> Sign In
-             </Link>
-           </Button>
-        ) : (
-          <Button variant="ghost" className="w-full justify-start gap-3 px-3 text-muted-foreground hover:text-destructive" onClick={handleLogout}>
-            <LogOut className="h-4 w-4" /> Sign Out
-          </Button>
-        )}
+        <Button variant="ghost" className="w-full justify-start gap-3 px-3 text-muted-foreground hover:text-destructive" onClick={handleLogout}>
+          <LogOut className="h-4 w-4" /> Sign Out
+        </Button>
       </div>
     </div>
   );
+
+  if (userLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row">
@@ -191,11 +199,7 @@ export default function DashboardPage() {
         <div className="max-w-6xl mx-auto">
           <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div>
-              {userLoading ? (
-                <Skeleton className="h-8 w-64 mb-2" />
-              ) : (
-                <h1 className="text-2xl md:text-3xl font-headline mb-1">Welcome back, {profile?.name || user?.displayName || 'Learner'}!</h1>
-              )}
+              <h1 className="text-2xl md:text-3xl font-headline mb-1">Welcome back, {profile?.name || user?.displayName || 'Learner'}!</h1>
               <p className="text-sm md:text-base text-muted-foreground">You are currently set as a <strong>{profile?.role || 'Student'}</strong>.</p>
             </div>
             <Button size="lg" className="rounded-full gap-2 w-full md:w-auto" asChild>

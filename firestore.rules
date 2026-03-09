@@ -1,24 +1,17 @@
-
 rules_version = '2';
 
-/**
- * Firestore Security Rules for SmartRead AI.
- * Public access enabled for the prototype phase to allow usage without authentication.
- */
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Allow public read and write access to all user-related data for prototyping
-    match /users/{userId}/{allPaths=**} {
-      allow read, write: if true;
-    }
-    
-    // Specifically allow access to the root user document
+    // Allow users to read and write only their own data
     match /users/{userId} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      match /{allPaths=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
     }
     
-    // Default deny for all other paths
+    // Default deny
     match /{document=**} {
       allow read, write: if false;
     }

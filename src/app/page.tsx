@@ -19,9 +19,14 @@ export default function LandingPage() {
             <Link href="#features" className="text-sm font-medium hover:text-primary transition-colors">Features</Link>
             <Link href="#how-it-works" className="text-sm font-medium hover:text-primary transition-colors">How it Works</Link>
           </nav>
-          <Button asChild>
-            <Link href="/dashboard">Enter App</Link>
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" asChild>
+              <Link href="/login">Sign In</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/register">Get Started</Link>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -42,10 +47,10 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button size="lg" className="h-12 px-8 text-base rounded-full" asChild>
-                <Link href="/dashboard">Get Started for Free</Link>
+                <Link href="/register">Join Now for Free</Link>
               </Button>
               <Button size="lg" variant="outline" className="h-12 px-8 text-base rounded-full" asChild>
-                <Link href="#features">Learn More</Link>
+                <Link href="#features">Explore Features</Link>
               </Button>
             </div>
           </div>
@@ -114,7 +119,7 @@ export default function LandingPage() {
               <h2 className="text-3xl md:text-5xl mb-8 font-headline leading-tight">Empower the next generation of readers with AI.</h2>
               <p className="text-lg opacity-80 mb-10">Join thousands of students and educators who are transforming the way we learn from written content.</p>
               <Button size="lg" variant="secondary" className="h-14 px-10 text-lg rounded-full" asChild>
-                <Link href="/dashboard">Try SmartRead Free</Link>
+                <Link href="/register">Create Your Account</Link>
               </Button>
             </div>
           </div>
